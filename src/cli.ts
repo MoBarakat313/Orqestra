@@ -12,6 +12,9 @@ import { parseCoordinationContract } from './core/coordination.js';
 import { resumeDurable, runDurable, type DurableReport } from './runtime/durable.js';
 import { resumeCoordinated, runCoordinated, type CoordinationReport } from './runtime/coordinator.js';
 import type { Profile, RoutePlan } from './core/types.js';
+import { inspectAccountUsage } from './runtime/accounting.js';
+import { evaluateBenchmark, parseBenchmark } from './core/evaluation.js';
+import type { UsageSummary } from './core/usage.js';
 
 const HELP = `Orqestra — policy routing and durable Codex execution
 
@@ -22,6 +25,8 @@ Usage:
   orqestra demo [--profile economy|balanced|quality]
   orqestra doctor [--codex <executable>]
   orqestra models [--codex <executable>] [--output <catalog.json> --config <path>]
+  orqestra usage [--codex <executable>]
+  orqestra benchmark --input <benchmark.json>
   orqestra run --request <execution.json> --project <directory> [--config <path>] [--codex <executable>] [--turn-timeout <seconds>] [--state-dir <directory>]
   orqestra resume --run-id <id> --request <execution.json> --project <directory> [--config <path>] [--codex <executable>] [--turn-timeout <seconds>] [--state-dir <directory>]
   orqestra coordinate --request <coordination.json> --project <directory> [--config <path>] [--codex <executable>] [--turn-timeout <seconds>]
@@ -35,6 +40,8 @@ run starts a durable, bounded worker run for standard, clear, low-risk work and 
 resume continues a matching paused checkpoint without repeating a worker whose edits are already present.
 coordinate runs dependency-aware packages in isolated worktrees and verifies their combined result.
 coordinate-resume continues a matching paused coordination checkpoint without redispatching committed packages.
+usage reads account-level observations without starting a model turn; ChatGPT account and API-key modes remain distinct.
+benchmark evaluates recorded direct-Codex and Orqestra pairs with matching task conditions.
 The worker has project-only write access and no network. Approval requests are cancelled and reported; none are granted automatically.
 Skill installation is project-local and preserves existing installations/settings.
 `;
@@ -81,12 +88,22 @@ function formatPlan(plan: RoutePlan): string {
   return lines.join('\n');
 }
 
+function formatUsage(usage: UsageSummary): string[] {
+  return [
+    `Usage: ${usage.attempts.measured}/${usage.attempts.total} worker turns measured | billing mode: ${usage.billingMode}`,
+    ...(usage.tokens ? [`Tokens: ${usage.tokens.totalTokens} total; ${usage.tokens.inputTokens} input (${usage.tokens.cachedInputTokens} cached, ${usage.tokens.cacheWriteInputTokens} cache write); ${usage.tokens.outputTokens} output (${usage.tokens.reasoningOutputTokens} reasoning)`] : ['Tokens: unavailable']),
+    `Cost: ${usage.cost.status} — ${usage.cost.reason}`,
+    ...usage.gaps.map(gap => `Usage gap: ${gap}`),
+  ];
+}
+
 async function main(): Promise<void> {
   const { values, positionals } = parseArgs({
     options: {
       config: { type: 'string' }, profile: { type: 'string' }, task: { type: 'string' },
       catalog: { type: 'string' }, codex: { type: 'string' }, json: { type: 'boolean' },
       output: { type: 'string' },
+      input: { type: 'string' },
       project: { type: 'string' },
       request: { type: 'string' },
       'turn-timeout': { type: 'string' },
@@ -101,6 +118,7 @@ async function main(): Promise<void> {
   const command = positionals[0]!;
   const allowed: Record<string, string[]> = {
     init: ['profile', 'config'], validate: ['config'], plan: ['task', 'config', 'catalog'], demo: ['profile'], doctor: ['codex'], models: ['codex', 'output', 'config'],
+    usage: ['codex'], benchmark: ['input'],
     run: ['request', 'project', 'config', 'codex', 'turn-timeout', 'state-dir'],
     resume: ['run-id', 'request', 'project', 'config', 'codex', 'turn-timeout', 'state-dir'],
     coordinate: ['request', 'project', 'config', 'codex', 'turn-timeout'],
@@ -156,6 +174,31 @@ async function main(): Promise<void> {
       ...(values.output ? [`Wrote ${values.output}; model roles come from the selected configuration.`] : []),
       'No model turn was started.',
     ].join('\n'));
+  } else if (command === 'usage') {
+    const report = await inspectAccountUsage(values.codex);
+    emit(report, [
+      `Codex: ${report.codexVersion} | Account mode: ${report.accountMode} | Billing mode: ${report.billingMode}`,
+      `Account usage: ${report.status}`,
+      ...(report.chatgpt?.rateLimits ?? []).map(bucket => `  ${bucket.limitName ?? bucket.limitId}: ${bucket.primary ? `${bucket.primary.usedPercent}% used` : 'no primary window'}`),
+      ...(report.chatgpt?.tokenActivity?.lifetimeTokens === null || report.chatgpt?.tokenActivity === null || report.chatgpt === null ? [] : [`Lifetime token activity: ${report.chatgpt.tokenActivity.lifetimeTokens}`]),
+      ...(report.api ? [`API accounting: ${report.api.reason}`] : []),
+      ...report.warnings.map(warning => `Note: ${warning}`),
+      'No model turn was started.',
+    ].join('\n'));
+  } else if (command === 'benchmark') {
+    if (!values.input) throw new InputError('benchmark requires --input <benchmark.json>');
+    const report = evaluateBenchmark(parseBenchmark(await readJson(values.input)));
+    emit(report, [
+      `Benchmark ${report.benchmarkId}: ${report.trials.executedPairs}/${report.trials.total} executed pairs`,
+      `Completion: direct ${report.completion.directSucceeded}; Orqestra ${report.completion.orqestraSucceeded}`,
+      `Verification: direct ${report.verification.directPassed}/${report.verification.directTotal}; Orqestra ${report.verification.orqestraPassed}/${report.verification.orqestraTotal}`,
+      `Regressions: direct ${report.regressions.direct}; Orqestra ${report.regressions.orqestra}`,
+      `Retries: direct ${report.retries.direct}; Orqestra ${report.retries.orqestra}`,
+      `Elapsed difference: ${report.elapsedMs.difference} ms`,
+      ...(report.tokens ? [`Measured paired token difference: ${report.tokens.difference.totalTokens}`] : ['Measured paired token difference: unavailable']),
+      ...(report.apiCostUsd ? [`Measured paired API cost difference: $${report.apiCostUsd.difference.toFixed(6)}`] : ['Measured paired API cost difference: unavailable']),
+      ...report.warnings.map(warning => `Note: ${warning}`),
+    ].join('\n'));
   } else if (command === 'run' || command === 'resume') {
     if (!values.request || !values.project) throw new InputError(`${command} requires --request <execution.json> and --project <directory>`);
     if (command === 'resume' && !values['run-id']) throw new InputError('resume requires --run-id <id>');
@@ -191,7 +234,7 @@ async function main(): Promise<void> {
       `Changed files: ${report.changes.changedFiles.join(', ') || 'none'}`,
       ...(report.latestWorker?.verification ?? []).map(check => `Verification ${check.name}: ${check.status}`),
       ...report.warnings.map(warning => `Note: ${warning}`),
-      'Usage is not measured in M4.',
+      ...formatUsage(report.usage),
     ].join('\n'));
     if (report.status !== 'succeeded') process.exitCode = 1;
   } else if (command === 'coordinate' || command === 'coordinate-resume') {
@@ -233,7 +276,7 @@ async function main(): Promise<void> {
       `Integration worktree: ${report.integration.worktree}`,
       ...report.integration.verification.map(check => `Verification ${check.name}: ${check.status}`),
       ...report.warnings.map(warning => `Note: ${warning}`),
-      'Usage is not measured in M5.',
+      ...formatUsage(report.usage),
     ].join('\n'));
     if (report.status !== 'succeeded') process.exitCode = 1;
   } else if (command === 'install-skill' || command === 'uninstall-skill') {

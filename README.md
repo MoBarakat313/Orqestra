@@ -4,7 +4,7 @@ Configurable orchestration for coding work inside Codex.
 
 Orqestra is being built to choose suitable models, keep worker context focused, and make execution and usage easier to understand. The intended interface is a Codex skill with guided setup, backed by a local helper.
 
-**Status: development preview.** Configuration, model policies, route previews, read-only Codex model discovery, project-local skill installation/removal, durable bounded worker execution, and isolated multi-package coordination are implemented. Measured savings are not available yet.
+**Status: development preview.** Configuration, model policies, route previews, read-only Codex model discovery, project-local skill installation/removal, durable bounded worker execution, isolated multi-package coordination, measured worker token reports, and paired evaluation are implemented. Published savings claims are not available.
 
 ## Direction
 
@@ -109,6 +109,17 @@ node dist/src/cli.js coordinate \
 Orqestra creates one detached worktree per package, waits for declared dependencies, enforces total and premium worker limits, commits only verified in-scope package changes, and assembles them in a separate integration worktree. The original checkout remains unchanged. Success requires every final integration check to pass; the report gives the verified worktree path for review.
 
 Use `coordinate-resume` with the reported run ID after a paused transport. Committed packages are not repeated. See [independent parallel work](docs/COORDINATION.md) for contract rules, scheduling, recovery, and integration behavior.
+
+## Inspect usage and evaluate paired runs
+
+```sh
+node dist/src/cli.js usage --json
+node dist/src/cli.js benchmark --input examples/benchmark.template.json --json
+```
+
+Worker reports keep input, cached input, cache-write input, output, reasoning-output, and total token categories when App Server exposes them. Missing or interrupted telemetry is reported as a visibility gap. ChatGPT account observations remain account-wide and are never converted to API cost; API-key reports do not invent organization billing data. The main Codex conversation remains outside the helper's visibility.
+
+The benchmark command accepts direct Codex and Orqestra observations tied to the same task contract and Git base commit. It reports completion, verification, regressions, retries, elapsed time, and only fully paired measured token or API-cost differences. See [usage accounting and paired evaluation](docs/ACCOUNTING_AND_EVALUATION.md).
 
 ## Development
 

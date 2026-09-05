@@ -59,4 +59,6 @@ The live report can include bounded verifier output and the worker's final messa
 
 The worker uses Codex `on-request` approvals. The transport accepts only command and file-change approval requests matching the active thread and turn. The CLI has no approval handler, so it replies `cancel`, interrupts the turn, reports `approval-required`, and never grants extra access automatically.
 
-Authentication refresh, tool input, MCP elicitation, and other server requests remain unsupported and fail closed. Usage remains `null` in M4; subscription usage is not converted to API cost and no savings claim is made.
+Authentication refresh, tool input, MCP elicitation, and other server requests remain unsupported and fail closed.
+
+The live worker report records final App Server token categories. Durable state persists the bounded usage summary for each completed attempt, allowing repair totals to survive resume. Fresh threads use their cumulative total; resumed threads use a before-and-after cumulative delta. Missing pre-turn or final snapshots remain explicit gaps. ChatGPT account usage is not converted to API cost, API billed amounts are unavailable without separate evidence, and the main Codex conversation remains outside the helper's visibility. See [usage accounting and paired evaluation](ACCOUNTING_AND_EVALUATION.md).

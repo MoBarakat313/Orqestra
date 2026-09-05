@@ -5,6 +5,10 @@ import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { Assignment } from '../core/types.js';
 import type { ExecutionContract, VerificationCommand } from '../core/execution.js';
+import {
+  attributeTurnUsage, parseTurnUsageNotification, summarizeUsage, unavailableTurnUsage,
+  type AccountMode, type TokenUsageBreakdown, type TurnUsage, type UsageSummary,
+} from '../core/usage.js';
 import { diagnose } from './doctor.js';
 import { readDiscovery } from './discovery.js';
 import { executableCommand } from './executable.js';
@@ -81,7 +85,7 @@ export interface WorkerReport {
   };
   verification: CommandResult[];
   warnings: string[];
-  usage: null;
+  usage: UsageSummary;
 }
 
 const ERROR_CATEGORIES = new Set([
@@ -306,6 +310,9 @@ export async function runWorker(contract: ExecutionContract, assignment: Assignm
   const approvals: ApprovalRequest[] = [];
   let activeThread: string | null = null;
   let activeTurn: string | null = null;
+  let accountMode: AccountMode = 'none';
+  let turnUsage: TurnUsage | null = null;
+  let threadUsageBaseline: TokenUsageBreakdown | null = null;
   let finalMessage: string | null = null;
   let completionResolve!: (value: Record<string, unknown>) => void;
   let completionReject!: (error: Error) => void;
@@ -325,6 +332,11 @@ export async function runWorker(contract: ExecutionContract, assignment: Assignm
     onNotification(method, params) {
       const body = params && typeof params === 'object' && !Array.isArray(params) ? params as Record<string, unknown> : null;
       if (!body) return;
+      if (method === 'thread/tokenUsage/updated' && activeThread && typeof body.turnId === 'string') {
+        const observed = parseTurnUsageNotification(body, accountMode, activeThread, body.turnId);
+        if (observed && activeTurn && body.turnId === activeTurn) turnUsage = observed;
+        else if (observed && !activeTurn) threadUsageBaseline = observed.threadTotal;
+      }
       if (method === 'item/completed' && body.threadId === activeThread && body.turnId === activeTurn) {
         const item = body.item && typeof body.item === 'object' && !Array.isArray(body.item) ? body.item as Record<string, unknown> : null;
         if (item?.type === 'agentMessage') finalMessage = clean(item.text, 16000);
@@ -363,12 +375,14 @@ export async function runWorker(contract: ExecutionContract, assignment: Assignm
   let turnId: string | null = null;
   try {
     const discovery = await readDiscovery(client, diagnostic.codex.version!);
+    accountMode = discovery.account.mode;
     if (discovery.account.mode === 'none') throw new ProtocolError('Codex did not report an authenticated account');
     const observed = discovery.models.find(model => model.id === assignment.id);
     if (!observed || !observed.reasoningEfforts.includes(assignment.reasoning)) {
       throw new ProtocolError(`Selected model or reasoning is unavailable: ${assignment.id}/${assignment.reasoning}`);
     }
     const threadMethod = options.resumeThreadId ? 'thread/resume' : 'thread/start';
+    if (options.resumeThreadId) activeThread = options.resumeThreadId;
     const started = record(await client.request(threadMethod, options.resumeThreadId ? {
       threadId: options.resumeThreadId, model: assignment.id, cwd: project,
       approvalPolicy: 'on-request', approvalsReviewer: 'user', sandbox: 'workspace-write', serviceName: 'orqestra',
@@ -405,6 +419,9 @@ export async function runWorker(contract: ExecutionContract, assignment: Assignm
     if (status !== 'completed' && status !== 'failed' && status !== 'interrupted') throw new ProtocolError('turn/completed has an invalid status');
     workerTurnStatus = status;
     completedTurn = completed;
+    // App Server normally emits the final usage snapshot with turn completion.
+    // A short drain also accepts an immediately following notification without delaying normal runs materially.
+    await delay(25);
   } finally {
     if (timer) clearTimeout(timer);
     options.signal?.removeEventListener('abort', abort);
@@ -441,6 +458,9 @@ export async function runWorker(contract: ExecutionContract, assignment: Assignm
       ...(!headUnchanged ? ['The worker changed Git history. Orqestra left the project untouched for manual review and did not report success.'] : []),
       ...(!files.length ? ['No working-tree change was detected, so Orqestra did not report success.'] : []),
     ],
-    usage: null,
+    usage: summarizeUsage('worker-turn', [turnUsage ? attributeTurnUsage(turnUsage, threadUsageBaseline, !options.resumeThreadId) : unavailableTurnUsage(accountMode,
+      workerTurnStatus === 'interrupted'
+        ? 'App Server did not expose a final token snapshot for the interrupted worker turn.'
+        : 'App Server did not expose a final token snapshot for this worker turn.')]),
   };
 }

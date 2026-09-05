@@ -61,7 +61,22 @@ test('one worker change succeeds only after independent verification passes', as
     assert.match(report.changes.evidenceSha256!, /^[a-f0-9]{64}$/u);
     assert(report.changes.evidenceBytes > Buffer.byteLength('?? result.txt\0'));
     assert.equal(await readFile(join(project, 'result.txt'), 'utf8'), 'done\n');
-    assert.equal(report.usage, null);
+    assert.equal(report.usage.attempts.measured, 1);
+    assert.equal(report.usage.tokens?.totalTokens, 120);
+    assert.equal(report.usage.tokens?.cachedInputTokens, 60);
+    assert.equal(report.usage.tokens?.cacheWriteInputTokens, 5);
+    assert.equal(report.usage.billingMode, 'chatgpt-account');
+    assert.equal(report.usage.cost.status, 'not-applicable');
+  });
+});
+
+test('missing final token telemetry remains an explicit visibility gap', async () => {
+  await projectFixture(async project => {
+    const report = await scenario('missing-usage', () => runWorker(contract(), assignment, { project, executable: workerFixture, turnTimeoutSeconds: 5 }));
+    assert.equal(report.status, 'succeeded');
+    assert.deepEqual(report.usage.attempts, { total: 1, measured: 0, unmeasured: 1 });
+    assert.equal(report.usage.tokens, null);
+    assert(report.usage.gaps.some(gap => gap.includes('did not expose')));
   });
 });
 

@@ -1,6 +1,6 @@
 # Configuration and commands
 
-The helper plans work offline, discovers Codex models, runs one bounded verified worker, and installs/removes its project-local skill. It does not run parallel workers, collect usage, or change Codex settings. Examples use `orqestra`; from a source checkout run `npm run build` and substitute `node dist/src/cli.js`. From an installed project skill, use `node <skill-directory>/scripts/orqestra.mjs`.
+The helper plans work offline, discovers Codex models, runs bounded verified workers, coordinates independent packages, records exposed token usage, evaluates paired benchmark records, and installs/removes its project-local skill. It does not change Codex settings. Examples use `orqestra`; from a source checkout run `npm run build` and substitute `node dist/src/cli.js`. From an installed project skill, use `node <skill-directory>/scripts/orqestra.mjs`.
 
 ## Commands
 
@@ -14,7 +14,12 @@ The helper plans work offline, discovers Codex models, runs one bounded verified
 | `orqestra doctor --codex /path/to/codex` | Check version/root help with timeouts; explain missing or incompatible CLI prerequisites. |
 | `orqestra models --codex /path/to/codex` | Read account mode and paginated model IDs/reasoning settings using App Server. No login or model turn. |
 | `orqestra models --config policy.json --output catalog.json` | Export matching configured models with observed reasoning settings. Refuse overwrites. |
+| `orqestra usage --codex /path/to/codex` | Read bounded account-level usage observations without starting a model turn; distinguish ChatGPT account and API-key modes. |
+| `orqestra benchmark --input benchmark.json` | Validate and summarize recorded direct Codex versus Orqestra pairs under shared task conditions. |
 | `orqestra run --request execution.json --project /path --config policy.json` | Start one standard implementation worker and independently run every declared acceptance command. |
+| `orqestra resume --run-id <id> --request execution.json --project /path --config policy.json` | Continue a matching paused durable run without duplicating completed work. |
+| `orqestra coordinate --request coordination.json --project /path --config policy.json` | Run independently owned packages in isolated worktrees and verify their integration. |
+| `orqestra coordinate-resume --run-id <id> --request coordination.json --project /path --config policy.json` | Continue matching paused package runs without redispatching committed packages. |
 | `orqestra install-skill --project /path/to/project` | Install the skill plus its helper at `.agents/skills/orqestra/`, preserving existing settings and installations. |
 | `orqestra uninstall-skill --project /path/to/project` | Remove an unchanged, manifest-owned skill; reject edits, added artifacts, and symlinked containers. |
 
@@ -100,3 +105,5 @@ These preservation checks assume the project is not concurrently modified during
 See [durable worker execution](EXECUTION.md) for the strict contract, clean-repository requirement, bounded repair, resume, approval behavior, cancellation, evidence, and success conditions.
 
 See [independent parallel work](COORDINATION.md) for package ownership, dependencies, dispatch limits, integration, and coordinated resume.
+
+See [usage accounting and paired evaluation](ACCOUNTING_AND_EVALUATION.md) for token categories, account/API boundaries, visibility gaps, and the benchmark record.

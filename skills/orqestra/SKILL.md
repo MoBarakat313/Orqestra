@@ -1,6 +1,6 @@
 ---
 name: orqestra
-description: Preview a coding task's route and model assignments, discover Codex models, diagnose prerequisites, run or resume a durable worker, or coordinate independent packages in isolated worktrees using an Orqestra policy.
+description: Preview coding routes and model assignments, discover Codex models, inspect usage, run or resume durable workers, coordinate independent packages, and evaluate paired direct-Codex comparisons using an Orqestra policy.
 ---
 
 # Orqestra
@@ -21,5 +21,8 @@ Use `node <this-skill-directory>/scripts/orqestra.mjs` as the helper command (ca
 - The CLI cancels and reports any approval request instead of granting it. Show the user the returned bounded approval details. Do not retry with broader permissions or altered policy without explicit user authorization. `SIGINT`/`SIGTERM` requests worker interruption.
 - `orqestra doctor --json` checks the CLI prerequisite without signing in, updating software, or starting a model turn. A detected App Server command does not prove protocol compatibility or account availability.
 - `orqestra models --json` initializes a local Codex App Server and reads account mode and model settings. It does not log in or start turns. Use `--codex <executable>` to select a compatible CLI; JavaScript entrypoints are supported. Export a policy-filtered catalog with `models --config <policy.json> --output <catalog.json>`. Existing files are not overwritten. Do not treat listed models as guaranteed authorization, or configured role capabilities as measured quality.
+- Use `orqestra usage --json` for bounded account-level observations without a model turn. Treat ChatGPT limits and token activity as account-wide, never as usage caused solely by this run. API-key mode does not expose organization billing through App Server; preserve its `null` cost instead of applying ChatGPT or hard-coded model prices.
+- Worker and coordination reports contain measured attempt-local token categories when available. Keep unmeasured attempts, interrupted-turn gaps, and the main conversation's outside-runtime coordinator usage visible. Never replace them with zero or an estimate.
+- For comparison, record repeated direct Codex and Orqestra executions from fresh worktrees at the same Git commit, using the same task contract and independent checks. Put both observations into the strict benchmark format and run `orqestra benchmark --input <benchmark.json> --json`. Leave unexecuted arms `null`; report only executed paired differences and include quality, regressions, retries, and time alongside tokens or measured API cost.
 
-Task plans remain previews until `run` or `coordinate` is invoked. Do not claim measured savings. Durable recovery and package ownership cover Git-visible project edits; they do not prove ignored files or external side effects were untouched. The selected main Codex model remains unchanged. Discovery is read-only at the protocol level; the Codex process may maintain its own normal caches/logs.
+Task plans remain previews until `run` or `coordinate` is invoked. Do not claim savings from a preview, incomplete benchmark pair, or account-wide percentage change. Durable recovery and package ownership cover Git-visible project edits; they do not prove ignored files or external side effects were untouched. The selected main Codex model remains unchanged. Discovery and account inspection are read-only at the protocol level; the Codex process may maintain its own normal caches/logs.

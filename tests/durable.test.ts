@@ -62,6 +62,8 @@ test('verification failure triggers one bounded repair and persists redacted met
       const result = await scenario('repair-requires-resume', count, () => runDurable(contract(), assignment, { project, executable: workerFixture, turnTimeoutSeconds: 5, maxAttempts: 2 }));
       assert.equal(result.status, 'succeeded');
       assert.equal(result.attempts, 2);
+      assert.deepEqual(result.usage.attempts, { total: 2, measured: 2, unmeasured: 0 });
+      assert.equal(result.usage.tokens?.totalTokens, 240);
       assert.equal(await readFile(join(project, 'result.txt'), 'utf8'), 'done\n');
       assert.equal((await readFile(count, 'utf8')).trim().split('\n').length, 2);
       const saved = await readFile(result.statePath, 'utf8');
@@ -71,6 +73,7 @@ test('verification failure triggers one bounded repair and persists redacted met
       const state = JSON.parse(saved);
       assert.equal(state.phase, 'terminal');
       assert.equal(state.attempts[0].outcome, 'verification-failed');
+      assert.equal(state.attempts[0].usage.tokens.totalTokens, 120);
       assert.match(state.attempts[0].verification[0].outputSha256, /^[a-f0-9]{64}$/u);
     } finally { await rm(count, { force: true }); }
   });

@@ -87,6 +87,8 @@ test('isolated packages honor dependencies and integrate without touching the or
       assert.equal(result.status, 'succeeded', JSON.stringify(result));
       assert.equal(result.maxConcurrentObserved, 2);
       assert.equal(result.maxPremiumObserved, 0);
+      assert.deepEqual(result.usage.attempts, { total: 3, measured: 3, unmeasured: 0 });
+      assert.equal(result.usage.tokens?.totalTokens, 360);
       assert(result.packages.every(item => item.status === 'committed' && item.commit));
       assert.equal((await readFile(join(result.integration.worktree, 'packages/c.txt'), 'utf8')).trim(), 'done c');
       assert.deepEqual(result.integration.changedFiles.sort(), ['packages/a.txt', 'packages/b.txt', 'packages/c.txt']);

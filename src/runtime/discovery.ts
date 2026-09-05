@@ -1,4 +1,5 @@
 import type { Catalog, Config } from '../core/types.js';
+import type { AccountMode } from '../core/usage.js';
 import { parseCatalog } from '../core/validation.js';
 import { diagnose } from './doctor.js';
 import { executableCommand } from './executable.js';
@@ -13,7 +14,7 @@ export interface DiscoveryReport {
   mode: 'codex-discovery';
   observedAt: string;
   codexVersion: string;
-  account: { mode: 'chatgpt' | 'apiKey' | 'none' | 'other'; requiresOpenaiAuth: boolean };
+  account: { mode: AccountMode; requiresOpenaiAuth: boolean };
   models: Array<{ id: string; displayName: string; reasoningEfforts: string[] }>;
   warnings: string[];
   modelTurnsStarted: 0;

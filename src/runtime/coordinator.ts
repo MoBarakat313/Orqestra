@@ -5,6 +5,7 @@ import type { CoordinationContract, CoordinationPackage } from '../core/coordina
 import { ownsPath, packageOrder } from '../core/coordination.js';
 import type { ExecutionContract } from '../core/execution.js';
 import type { Assignment } from '../core/types.js';
+import { combineUsageSummaries, summarizeUsage, unavailableTurnUsage, validUsageSummary, type UsageSummary } from '../core/usage.js';
 import { durableStatePath, resumeDurable, runDurable, type DurableReport, type StoredVerification } from './durable.js';
 import { ProtocolError } from './stdio-client.js';
 import { sameSnapshot, snapshotProject, verifyContract, type CommandResult, type ProjectSnapshot } from './worker.js';
@@ -26,6 +27,7 @@ export interface PackageState {
   commit: string | null;
   attempts: number;
   failureCode: string | null;
+  usage?: UsageSummary;
 }
 
 export interface IntegrationState {
@@ -83,6 +85,7 @@ export interface PackageReport {
   commit: string | null;
   attempts: number;
   failureCode: string | null;
+  usage: UsageSummary | null;
 }
 
 export interface CoordinationReport {
@@ -106,7 +109,7 @@ export interface CoordinationReport {
   limits: { maxWorkers: number; maxPremiumWorkers: number; maxAttempts: number };
   failureCode: string | null;
   warnings: string[];
-  usage: null;
+  usage: UsageSummary;
 }
 
 const RUN_ID = /^[a-f0-9]{8}-[a-f0-9-]{27,55}$/u;
@@ -182,7 +185,8 @@ async function readState(path: string): Promise<CoordinationState> {
       && typeof item.prepared === 'boolean' && PACKAGE_STATUSES.has(item.status) && Array.isArray(item.dependenciesApplied)
       && item.dependenciesApplied.every(id => typeof id === 'string') && (item.startHead === null || typeof item.startHead === 'string')
       && (item.commit === null || typeof item.commit === 'string') && Number.isSafeInteger(item.attempts) && item.attempts >= 0
-      && (item.failureCode === null || typeof item.failureCode === 'string'));
+      && (item.failureCode === null || typeof item.failureCode === 'string')
+      && (item.usage === undefined || validUsageSummary(item.usage)));
   const integrationValid = state.integration && state.integration.owner === 'orqestra' && typeof state.integration.worktree === 'string'
     && typeof state.integration.prepared === 'boolean' && ['pending', 'applying', 'verifying', 'succeeded', 'failed'].includes(state.integration.status)
     && Array.isArray(state.integration.applied) && state.integration.applied.every(id => typeof id === 'string')
@@ -240,9 +244,15 @@ class Journal {
 }
 
 function makeReport(state: CoordinationState, statePath: string, verification: CommandResult[] = []): CoordinationReport {
+  const usageParts = state.packages.flatMap(item => {
+    if (item.usage) return [item.usage];
+    return Array.from({ length: item.attempts }, () => summarizeUsage('worker-turn', [
+      unavailableTurnUsage('other', 'This package attempt predates persisted M6 usage accounting.'),
+    ]));
+  });
   return {
     schemaVersion: 1, mode: 'coordinated-run', runId: state.runId, statePath, status: state.status, selected: state.selected,
-    packages: state.packages.map(item => ({ id: item.id, status: item.status, worktree: item.worktree, commit: item.commit, attempts: item.attempts, failureCode: item.failureCode })),
+    packages: state.packages.map(item => ({ id: item.id, status: item.status, worktree: item.worktree, commit: item.commit, attempts: item.attempts, failureCode: item.failureCode, usage: item.usage ?? null })),
     integration: {
       owner: 'orqestra', status: state.integration.status, worktree: state.integration.worktree,
       head: state.integration.head, changedFiles: state.integration.changedFiles, verification,
@@ -256,7 +266,7 @@ function makeReport(state: CoordinationState, statePath: string, verification: C
       ...(state.status === 'succeeded' ? ['The verified integrated result remains in the reported integration worktree for review.'] : []),
       ...(state.status === 'paused' ? ['At least one worker paused after transport loss. Resume this coordination run explicitly.'] : []),
     ],
-    usage: null,
+    usage: combineUsageSummaries('coordinated-run', usageParts),
   };
 }
 
@@ -340,7 +350,7 @@ async function executePackage(
         if (assignment.group === 'premium') current.activePremiumWorkers = Math.max(0, current.activePremiumWorkers - 1);
       });
     }
-    await journal.update(() => { packageState.attempts = result.attempts; });
+    await journal.update(() => { packageState.attempts = result.attempts; packageState.usage = result.usage; });
     if (result.status !== 'succeeded') {
       const status: PackageStatus = result.status === 'paused' ? 'paused' : result.status === 'cancelled' ? 'cancelled' : 'failed';
       await journal.update(() => { packageState.status = status; packageState.failureCode = result.failure?.code ?? result.status; });

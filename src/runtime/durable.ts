@@ -4,6 +4,7 @@ import { lstat, mkdir, open, readFile, realpath, rename, unlink, writeFile } fro
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { ExecutionContract } from '../core/execution.js';
 import type { Assignment } from '../core/types.js';
+import { combineUsageSummaries, summarizeUsage, unavailableTurnUsage, validUsageSummary, type UsageSummary } from '../core/usage.js';
 import { ProtocolError } from './stdio-client.js';
 import {
   runWorker, sameSnapshot, snapshotProject, verifyContract,
@@ -39,6 +40,7 @@ export interface AttemptState {
   result: ProjectSnapshot;
   verification: StoredVerification[];
   workerError: WorkerReport['workerError'];
+  usage?: UsageSummary;
 }
 
 interface ActiveAttempt {
@@ -89,7 +91,7 @@ export interface DurableReport {
   failure: DurableFailure | null;
   latestWorker: WorkerReport | null;
   warnings: string[];
-  usage: null;
+  usage: UsageSummary;
 }
 
 const RUN_ID = /^[a-f0-9]{8}-[a-f0-9-]{27,55}$/u;
@@ -122,7 +124,8 @@ function validAttempt(value: unknown, number: number): value is AttemptState {
       && HASH.test(check.outputSha256) && Number.isSafeInteger(check.outputBytes) && check.outputBytes >= 0
       && typeof check.outputTruncated === 'boolean' && Number.isSafeInteger(check.durationMs) && check.durationMs >= 0)
     && (item.workerError === null || (typeof item.workerError.category === 'string'
-      && (item.workerError.httpStatusCode === null || Number.isSafeInteger(item.workerError.httpStatusCode))));
+      && (item.workerError.httpStatusCode === null || Number.isSafeInteger(item.workerError.httpStatusCode))))
+    && (item.usage === undefined || validUsageSummary(item.usage));
 }
 
 function validFailure(value: unknown): value is DurableFailure | null {
@@ -283,10 +286,16 @@ function attemptFromReport(number: number, startedAt: string, baseline: ProjectS
   return {
     number, startedAt, completedAt: report.completedAt, threadId: report.threadId, turnId: report.turnId,
     outcome: report.status, baseline, result, verification: storedVerification(report.verification), workerError: report.workerError,
+    usage: report.usage,
   };
 }
 
 function report(state: DurableRunState, statePath: string, latestWorker: WorkerReport | null): DurableReport {
+  const usageParts = state.attempts.map(item => item.usage
+    ?? summarizeUsage('worker-turn', [unavailableTurnUsage('other', 'This attempt predates persisted M6 usage accounting.')]));
+  if (state.activeAttempt) {
+    usageParts.push(summarizeUsage('worker-turn', [unavailableTurnUsage('other', 'The active attempt ended before final token telemetry could be persisted.')]));
+  }
   return {
     schemaVersion: 1, mode: 'durable-run', runId: state.runId, statePath, status: state.status,
     phase: state.phase, attempts: state.attempts.length + (state.activeAttempt ? 1 : 0), maxAttempts: state.maxAttempts,
@@ -296,7 +305,7 @@ function report(state: DurableRunState, statePath: string, latestWorker: WorkerR
       ...(state.status === 'paused' ? ['The run paused after transport loss. Resume it explicitly; Orqestra did not start a duplicate worker.'] : []),
       ...(state.status === 'verification-failed' ? ['Useful edits and verification evidence remain in the project for review.'] : []),
     ],
-    usage: null,
+    usage: combineUsageSummaries('durable-run', usageParts),
   };
 }
 

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "benchmarkId": "example-paired-evaluation",
+  "trials": [
+    {
+      "id": "task-a-repeat-1",
+      "taskId": "task-a",
+      "contractSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "baseCommit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "direct": null,
+      "orqestra": null
+    }
+  ]
+}

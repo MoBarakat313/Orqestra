@@ -41,6 +41,15 @@ if (arg === '--version') {
         data: [{ id: next ? 'two' : 'one', model: next ? 'gpt-6-astra' : 'gpt-5.6-terra', displayName: next ? 'Fixture Astra' : 'Fixture Terra', hidden: false, supportedReasoningEfforts: [{ reasoningEffort: 'medium', description: 'fixture' }] }],
         nextCursor: next ? null : 'second',
       } });
+    } else if (request.method === 'account/rateLimits/read') {
+      send({ id: request.id, result: { rateLimitsByLimitId: {
+        codex: { limitId: 'codex', limitName: null, primary: { usedPercent: 25, windowDurationMins: 300, resetsAt: 1780000000 }, secondary: null },
+      } } });
+    } else if (request.method === 'account/usage/read') {
+      send({ id: request.id, result: {
+        summary: { lifetimeTokens: 123456, peakDailyTokens: 12000, longestRunningTurnSec: 40, currentStreakDays: 3, longestStreakDays: 8 },
+        dailyUsageBuckets: [{ startDate: '2026-09-05', tokens: 1234 }],
+      } });
     } else {
       // Discovery must never request login, thread creation, or model execution.
       send({ id: request.id, error: { code: -32601, message: 'Unexpected operation' } });

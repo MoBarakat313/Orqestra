@@ -11,12 +11,25 @@ if (arg === '--version') {
   const scenario = process.env.ORQESTRA_WORKER_SCENARIO ?? 'success';
   const input = createInterface({ input: process.stdin });
   let cwd = process.cwd();
+  let resumedThread = false;
   const threadId = 'thread-fixture';
   const turnId = 'turn-fixture';
   const send = (value: unknown): void => { process.stdout.write(JSON.stringify(value) + '\n'); };
   const complete = (status: 'completed' | 'failed' | 'interrupted'): void => {
     if (status === 'completed') {
       send({ method: 'item/completed', params: { threadId, turnId, completedAtMs: Date.now(), item: { type: 'agentMessage', id: 'message-1', text: '{"summary":"fixture completed"}', phase: 'final_answer' } } });
+    }
+    if (scenario !== 'missing-usage' && status !== 'interrupted') {
+      send({ method: 'thread/tokenUsage/updated', params: {
+        threadId, turnId,
+        tokenUsage: {
+          last: { inputTokens: 100, cachedInputTokens: 60, cacheWriteInputTokens: 5, outputTokens: 20, reasoningOutputTokens: 8, totalTokens: 120 },
+          total: resumedThread
+            ? { inputTokens: 300, cachedInputTokens: 180, cacheWriteInputTokens: 10, outputTokens: 70, reasoningOutputTokens: 25, totalTokens: 370 }
+            : { inputTokens: 100, cachedInputTokens: 60, cacheWriteInputTokens: 5, outputTokens: 20, reasoningOutputTokens: 8, totalTokens: 120 },
+          modelContextWindow: 200000,
+        },
+      } });
     }
     send({ method: 'turn/completed', params: { threadId, turn: { id: turnId, items: [], status, error: status === 'failed' ? { message: 'private fixture failure', codexErrorInfo: { httpConnectionFailed: { httpStatusCode: 503 } } } : null } } });
   };
@@ -31,7 +44,7 @@ if (arg === '--version') {
     if (request.method === 'initialize') send({ id: request.id, result: { userAgent: 'worker-fixture' } });
     else if (request.method === 'account/read') {
       if (scenario === 'exit-during-discovery') process.exit(9);
-      else send({ id: request.id, result: { account: { type: 'chatgpt' }, requiresOpenaiAuth: true } });
+      else send({ id: request.id, result: { account: { type: process.env.ORQESTRA_ACCOUNT_MODE ?? 'chatgpt' }, requiresOpenaiAuth: true } });
     }
     else if (request.method === 'model/list') send({ id: request.id, result: { data: scenario === 'model-unavailable' ? [] : [{ model: 'gpt-5.6-terra', displayName: 'Fixture Terra', supportedReasoningEfforts: [{ reasoningEffort: 'medium' }] }], nextCursor: null } });
     else if (request.method === 'thread/start' || request.method === 'thread/resume') {
@@ -40,7 +53,16 @@ if (arg === '--version') {
         return;
       }
       cwd = String(request.params?.cwd ?? cwd);
+      resumedThread = request.method === 'thread/resume';
       send({ id: request.id, result: { thread: { id: threadId, sessionId: threadId, ephemeral: true } } });
+      if (request.method === 'thread/resume') send({ method: 'thread/tokenUsage/updated', params: {
+        threadId, turnId: 'turn-previous',
+        tokenUsage: {
+          last: { inputTokens: 80, cachedInputTokens: 40, cacheWriteInputTokens: 2, outputTokens: 10, reasoningOutputTokens: 3, totalTokens: 90 },
+          total: { inputTokens: 200, cachedInputTokens: 120, cacheWriteInputTokens: 5, outputTokens: 50, reasoningOutputTokens: 17, totalTokens: 250 },
+          modelContextWindow: 200000,
+        },
+      } });
     } else if (request.method === 'turn/start') {
       if (process.env.ORQESTRA_WORKER_COUNT_FILE) appendFileSync(process.env.ORQESTRA_WORKER_COUNT_FILE, 'turn\n');
       const packageId = basename(cwd).replace(/^pkg-/u, '');
