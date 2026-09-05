@@ -1,0 +1,11 @@
+.references/
+.orqestra/
+.env
+.env.*
+!.env.example
+.DS_Store
+node_modules/
+dist/
+coverage/
+*.tgz
+orqestra.config.json
