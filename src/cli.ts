@@ -8,7 +8,7 @@ import { diagnose } from './runtime/doctor.js';
 import { catalogFromDiscovery, discoverModels } from './runtime/discovery.js';
 import { installSkill, uninstallSkill } from './runtime/skill-install.js';
 import { parseExecutionContract } from './core/execution.js';
-import { runWorker, type WorkerReport } from './runtime/worker.js';
+import { resumeDurable, runDurable, type DurableReport } from './runtime/durable.js';
 import type { Profile, RoutePlan } from './core/types.js';
 
 const HELP = `Orqestra — policy previews and Codex discovery
@@ -20,13 +20,15 @@ Usage:
   orqestra demo [--profile economy|balanced|quality]
   orqestra doctor [--codex <executable>]
   orqestra models [--codex <executable>] [--output <catalog.json> --config <path>]
-  orqestra run --request <execution.json> --project <directory> [--config <path>] [--codex <executable>] [--turn-timeout <seconds>]
+  orqestra run --request <execution.json> --project <directory> [--config <path>] [--codex <executable>] [--turn-timeout <seconds>] [--state-dir <directory>]
+  orqestra resume --run-id <id> --request <execution.json> --project <directory> [--config <path>] [--codex <executable>] [--turn-timeout <seconds>] [--state-dir <directory>]
   orqestra install-skill --project <directory>
   orqestra uninstall-skill --project <directory>
 
 All commands support --json. Default config: ./orqestra.config.json
 Plans are previews. models contacts the Codex runtime for account mode and model discovery.
-run starts exactly one model turn for standard, clear, low-risk work and independently verifies its changes.
+run starts a durable, bounded worker run for standard, clear, low-risk work and independently verifies its changes.
+resume continues a matching paused checkpoint without repeating a worker whose edits are already present.
 The worker has project-only write access and no network. Approval requests are cancelled and reported; none are granted automatically.
 Skill installation is project-local and preserves existing installations/settings.
 `;
@@ -82,6 +84,8 @@ async function main(): Promise<void> {
       project: { type: 'string' },
       request: { type: 'string' },
       'turn-timeout': { type: 'string' },
+      'run-id': { type: 'string' },
+      'state-dir': { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },
     allowPositionals: true, strict: true,
@@ -91,7 +95,8 @@ async function main(): Promise<void> {
   const command = positionals[0]!;
   const allowed: Record<string, string[]> = {
     init: ['profile', 'config'], validate: ['config'], plan: ['task', 'config', 'catalog'], demo: ['profile'], doctor: ['codex'], models: ['codex', 'output', 'config'],
-    run: ['request', 'project', 'config', 'codex', 'turn-timeout'],
+    run: ['request', 'project', 'config', 'codex', 'turn-timeout', 'state-dir'],
+    resume: ['run-id', 'request', 'project', 'config', 'codex', 'turn-timeout', 'state-dir'],
     'install-skill': ['project'], 'uninstall-skill': ['project'],
   };
   if (!Object.hasOwn(allowed, command)) throw new InputError(`Unknown command: ${command}; use --help.`);
@@ -126,7 +131,7 @@ async function main(): Promise<void> {
     emit({ mode: 'offline-demo', plans, usage: null }, plans.map(formatPlan).join('\n\n'));
   } else if (command === 'doctor') {
     const report = await diagnose(values.codex);
-    emit(report, [`Node: ${report.node.version}`, `Codex: ${report.codex.version ?? 'not detected'} (${report.codex.status})`, ...report.messages, 'One-worker execution is implemented; run it only with an explicit acceptance contract.'].join('\n'));
+    emit(report, [`Node: ${report.node.version}`, `Codex: ${report.codex.version ?? 'not detected'} (${report.codex.status})`, ...report.messages, 'Durable single-worker execution is implemented; run it only with an explicit acceptance contract.'].join('\n'));
     if (!report.ready) process.exitCode = 1;
   } else if (command === 'models') {
     if (values.config && !values.output) throw new InputError('--config is only used with --output when exporting a catalog');
@@ -143,36 +148,42 @@ async function main(): Promise<void> {
       ...(values.output ? [`Wrote ${values.output}; model roles come from the selected configuration.`] : []),
       'No model turn was started.',
     ].join('\n'));
-  } else if (command === 'run') {
-    if (!values.request || !values.project) throw new InputError('run requires --request <execution.json> and --project <directory>');
+  } else if (command === 'run' || command === 'resume') {
+    if (!values.request || !values.project) throw new InputError(`${command} requires --request <execution.json> and --project <directory>`);
+    if (command === 'resume' && !values['run-id']) throw new InputError('resume requires --run-id <id>');
     const config = parseConfig(await readJson(configPath));
     const contract = parseExecutionContract(await readJson(values.request));
     const plan = planTask(config, contract.task);
-    if (plan.route !== 'single') throw new InputError(`M3 runs only the single-worker route; this task routes to ${plan.route}`);
+    if (plan.route !== 'single') throw new InputError(`M4 runs only the single-worker route; this task routes to ${plan.route}`);
     const assignment = plan.assignments.find(candidate => candidate.role === 'implement');
     if (!assignment) throw new InputError('The selected plan has no implementation worker');
     const controller = new AbortController();
     const abort = (): void => controller.abort();
     process.once('SIGINT', abort);
     process.once('SIGTERM', abort);
-    let report: WorkerReport;
+    let report: DurableReport;
     try {
-      report = await runWorker(contract, assignment, {
+      const options = {
         project: values.project, ...(values.codex ? { executable: values.codex } : {}),
         turnTimeoutSeconds: boundedInteger(values['turn-timeout'], 900, '--turn-timeout', 1, 3600),
-        signal: controller.signal,
-      });
+        signal: controller.signal, maxAttempts: plan.maxAttempts,
+        ...(values['state-dir'] ? { stateDirectory: values['state-dir'] } : {}),
+      };
+      report = command === 'run'
+        ? await runDurable(contract, assignment, options)
+        : await resumeDurable(values['run-id']!, contract, assignment, options);
     } finally {
       process.removeListener('SIGINT', abort);
       process.removeListener('SIGTERM', abort);
     }
     emit(report, [
-      `Orqestra worker: ${report.status}`,
+      `Orqestra run ${report.runId}: ${report.status}`,
       `Model: ${report.selected.id} (${report.selected.reasoning}) | attempts: ${report.attempts}`,
+      `Checkpoint: ${report.statePath}`,
       `Changed files: ${report.changes.changedFiles.join(', ') || 'none'}`,
-      ...report.verification.map(check => `Verification ${check.name}: ${check.status}`),
+      ...(report.latestWorker?.verification ?? []).map(check => `Verification ${check.name}: ${check.status}`),
       ...report.warnings.map(warning => `Note: ${warning}`),
-      'Usage is not measured in M3.',
+      'Usage is not measured in M4.',
     ].join('\n'));
     if (report.status !== 'succeeded') process.exitCode = 1;
   } else if (command === 'install-skill' || command === 'uninstall-skill') {

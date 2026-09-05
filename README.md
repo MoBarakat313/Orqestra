@@ -4,7 +4,7 @@ Configurable orchestration for coding work inside Codex.
 
 Orqestra is being built to choose suitable models, keep worker context focused, and make execution and usage easier to understand. The intended interface is a Codex skill with guided setup, backed by a local helper.
 
-**Status: development preview.** Configuration, model policies, route previews, read-only Codex model discovery, project-local skill installation/removal, and one bounded verified worker are implemented. Parallel work, durable recovery, and measured savings are not available yet.
+**Status: development preview.** Configuration, model policies, route previews, read-only Codex model discovery, project-local skill installation/removal, and durable bounded worker execution are implemented. Parallel work and measured savings are not available yet.
 
 ## Direction
 
@@ -70,7 +70,7 @@ Use `--codex /path/to/codex` if the default CLI is incompatible. A native execut
 
 See [configuration and command documentation](docs/CONFIGURATION.md) and [tested compatibility](docs/COMPATIBILITY.md). The package is not published to npm; source checkout and local `npm pack` installation are development paths.
 
-## Run one verified worker
+## Run a durable verified worker
 
 Create an execution contract from [examples/execution.json](examples/execution.json), use a disposable clean Git repository or worktree, then run:
 
@@ -81,7 +81,19 @@ node dist/src/cli.js run \
   --config /absolute/path/to/orqestra.config.json
 ```
 
-This starts one Codex turn with project-only writes and no network, then runs the declared checks independently. Every check must pass before the result says `succeeded`. Approval requests are cancelled and reported by the CLI; Orqestra never grants them automatically. See [one-worker execution](docs/EXECUTION.md) for the contract, evidence, and failure behavior.
+This creates a checkpoint under the repository's private Git metadata, starts a Codex worker with project-only writes and no network, and runs the declared checks independently. Failed verification can start a repair turn up to the policy's `maxAttempts`. Every check must pass before the result says `succeeded`.
+
+If the App Server connection ends unexpectedly, `run` returns `paused` with a run ID. Resume with the same project, request, and policy:
+
+```sh
+node dist/src/cli.js resume \
+  --run-id <id-from-run-report> \
+  --request /absolute/path/to/execution.json \
+  --project /absolute/path/to/project \
+  --config /absolute/path/to/orqestra.config.json
+```
+
+Resume verifies detected edits before starting another turn and reopens the saved Codex thread for any repair. Approval requests are cancelled and reported by the CLI; Orqestra never grants them automatically. See [durable worker execution](docs/EXECUTION.md) for checkpoints, recovery, evidence, and failure behavior.
 
 ## Development
 

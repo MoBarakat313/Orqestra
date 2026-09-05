@@ -124,6 +124,12 @@ test('App Server exit after turn acknowledgement fails immediately', async () =>
   });
 });
 
+test('App Server exit during discovery rejects without an unhandled completion', async () => {
+  await projectFixture(async project => {
+    await assert.rejects(scenario('exit-during-discovery', () => runWorker(contract(), assignment, { project, executable: workerFixture, turnTimeoutSeconds: 5 })), /exited/);
+  });
+});
+
 test('a dirty project is rejected before a model turn can start', async () => {
   await projectFixture(async project => {
     await writeFile(join(project, 'local.txt'), 'preserve\n');

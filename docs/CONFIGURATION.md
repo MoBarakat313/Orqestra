@@ -26,7 +26,7 @@ All commands accept `--json`. Success output goes to stdout; input/operation err
 
 Each model alias has an `id`, `runtime`, `group` (`standard` or `premium`), supported `reasoningEfforts`, and `capabilities` (`read`, `code`, `plan`, `review`). Roles are `explore`, `implement`, `plan`, `review`, and `escalate`; each lists ordered `{ "model": "alias", "reasoning": "medium" }` candidates.
 
-The router selects the first eligible configured candidate. Later candidates are explicit availability/policy fallbacks, not failure-retry instructions. Failure-based escalation is a later milestone; the `escalate` role reserves its policy. `explore` is also a reserved role and is not automatically scheduled by offline plans.
+The router selects the first eligible configured candidate. Later candidates are explicit availability/policy fallbacks, not failure-retry instructions. M4 repair turns keep the selected implementer and its persisted thread; model escalation remains a later milestone. The `escalate` and `explore` roles are reserved and are not automatically scheduled by the current single-worker route.
 
 New model IDs, runtime names, and reasoning strings can be added through configuration. That proves policy extensibility, not that an execution adapter exists for that runtime. Declared capabilities and prices are not intelligence scores. Prices are intentionally absent from this initial schema.
 
@@ -56,7 +56,7 @@ Verification is `focused`, `targeted-review`, or `critical-review`. High-risk wo
 
 ## Limits and truthfulness
 
-`maxWorkers` is 1–16, `maxPremiumWorkers` is 0–`maxWorkers`, and `maxAttempts` is 1–5. These are Orqestra schema bounds, not claims about the host platform's limits. M1 uses them for selection and previews; M3–M5 will add dispatch/retry enforcement. Setting premium capacity to zero makes premium candidates ineligible; missing approved alternatives result in an error.
+`maxWorkers` is 1–16, `maxPremiumWorkers` is 0–`maxWorkers`, and `maxAttempts` is 1–5. These are Orqestra schema bounds, not claims about the host platform's limits. M4 enforces `maxAttempts` for the single-worker route; M5 will enforce concurrency limits. Setting premium capacity to zero makes premium candidates ineligible; missing approved alternatives result in an error.
 
 Without a catalog, plans report `availability: "unverified"`. All plans have `mode: "preview"` and `usage: null`. None reports avoided tokens, saved allowance, or API dollars. The main Codex session's model is not switched by this helper.
 
@@ -97,4 +97,4 @@ Project installation writes only a new `.agents/skills/orqestra/` directory (and
 
 These preservation checks assume the project is not concurrently modified during installation/removal; they are not an adversarial filesystem sandbox. Automatic updates and arbitrary custom-skill migration remain future work.
 
-See [one-worker execution](EXECUTION.md) for the strict contract, clean-repository requirement, approval behavior, cancellation, evidence, and success conditions.
+See [durable worker execution](EXECUTION.md) for the strict contract, clean-repository requirement, bounded repair, resume, approval behavior, cancellation, evidence, and success conditions.

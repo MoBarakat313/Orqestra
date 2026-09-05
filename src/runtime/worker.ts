@@ -29,9 +29,14 @@ export interface WorkerOptions {
   turnTimeoutSeconds?: number;
   signal?: AbortSignal;
   approvalHandler?: (request: ApprovalRequest) => Promise<ApprovalDecision> | ApprovalDecision;
+  expectedBaseline?: ProjectSnapshot;
+  ephemeral?: boolean;
+  repair?: { attempt: number; previousFailure: string };
+  resumeThreadId?: string;
+  onCheckpoint?: (checkpoint: WorkerCheckpoint) => Promise<void> | void;
 }
 
-interface CommandResult {
+export interface CommandResult {
   name: string;
   command: string[];
   status: 'passed' | 'failed' | 'timed-out' | 'cancelled' | 'could-not-start';
@@ -40,6 +45,18 @@ interface CommandResult {
   outputTruncated: boolean;
   durationMs: number;
 }
+
+export interface ProjectSnapshot {
+  head: string;
+  changedFiles: string[];
+  evidenceSha256: string | null;
+  evidenceBytes: number;
+}
+
+export type WorkerCheckpoint =
+  | { phase: 'thread-started'; threadId: string }
+  | { phase: 'turn-started'; threadId: string; turnId: string }
+  | { phase: 'verification-started'; snapshot: ProjectSnapshot };
 
 export interface WorkerReport {
   schemaVersion: 1;
@@ -162,12 +179,22 @@ async function changeEvidence(project: string, status: Buffer, diff: Buffer): Pr
   };
 }
 
+async function terminate(child: ReturnType<typeof spawn>, signal: NodeJS.Signals): Promise<void> {
+  if (child.pid && process.platform !== 'win32') {
+    try { process.kill(-child.pid, signal); return; } catch { /* Fall back to the direct child. */ }
+  }
+  try { child.kill(signal); } catch { /* The process already exited. */ }
+}
+
 async function runVerification(project: string, check: VerificationCommand, signal?: AbortSignal): Promise<CommandResult> {
   const started = Date.now();
   if (signal?.aborted) return { name: check.name, command: check.command, status: 'cancelled', exitCode: null, output: '', outputTruncated: false, durationMs: 0 };
   return await new Promise(resolve => {
     const [command, ...args] = check.command;
-    const child = spawn(command!, args, { cwd: project, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    const child = spawn(command!, args, {
+      cwd: project, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
+      detached: process.platform !== 'win32',
+    });
     const chunks: Buffer[] = [];
     let bytes = 0;
     let truncated = false;
@@ -186,15 +213,15 @@ async function runVerification(project: string, check: VerificationCommand, sign
     let forceTimer: ReturnType<typeof setTimeout> | undefined;
     const abort = (): void => {
       cancelled = true;
-      child.kill('SIGTERM');
-      forceTimer = setTimeout(() => child.kill('SIGKILL'), 1000);
+      void terminate(child, 'SIGTERM');
+      forceTimer = setTimeout(() => { void terminate(child, 'SIGKILL'); }, 1000);
     };
     signal?.addEventListener('abort', abort, { once: true });
     if (signal?.aborted) abort();
     const timer = setTimeout(() => {
       timedOut = true;
-      child.kill('SIGTERM');
-      forceTimer ??= setTimeout(() => child.kill('SIGKILL'), 1000);
+      void terminate(child, 'SIGTERM');
+      forceTimer ??= setTimeout(() => { void terminate(child, 'SIGKILL'); }, 1000);
     }, check.timeoutSeconds * 1000);
     child.once('error', () => {
       clearTimeout(timer);
@@ -216,9 +243,40 @@ async function runVerification(project: string, check: VerificationCommand, sign
   });
 }
 
-function prompt(contract: ExecutionContract): string {
+export async function snapshotProject(projectPath: string): Promise<ProjectSnapshot> {
+  const project = await realpath(projectPath);
+  const head = (await git(project, ['rev-parse', 'HEAD'], 1024)).toString('utf8').trim();
+  const status = await git(project, ['status', '--porcelain=v1', '-z', '--untracked-files=all']);
+  const diff = await git(project, ['diff', '--no-ext-diff', '--binary', 'HEAD', '--']);
+  const evidence = await changeEvidence(project, status, diff);
+  return { head, changedFiles: evidence.files, evidenceSha256: evidence.digest, evidenceBytes: evidence.bytes };
+}
+
+export function sameSnapshot(left: ProjectSnapshot, right: ProjectSnapshot): boolean {
+  return left.head === right.head && left.evidenceSha256 === right.evidenceSha256
+    && left.evidenceBytes === right.evidenceBytes
+    && left.changedFiles.length === right.changedFiles.length
+    && left.changedFiles.every((path, index) => path === right.changedFiles[index]);
+}
+
+export async function verifyContract(projectPath: string, checks: VerificationCommand[], signal?: AbortSignal): Promise<CommandResult[]> {
+  const project = await realpath(projectPath);
+  const results: CommandResult[] = [];
+  for (const check of checks) {
+    const result = await runVerification(project, check, signal);
+    results.push(result);
+    if (result.status !== 'passed') break;
+  }
+  return results;
+}
+
+function prompt(contract: ExecutionContract, repair?: WorkerOptions['repair']): string {
   return [
     'You are the single bounded implementation worker for Orqestra.',
+    ...(repair ? [
+      `This is repair attempt ${repair.attempt}. Preserve useful existing edits and fix the remaining verification failure.`,
+      `Previous verification result: ${clean(repair.previousFailure, 8000) ?? 'failure details unavailable'}`,
+    ] : []),
     `Objective: ${contract.task.objective}`,
     'Acceptance criteria:',
     ...contract.acceptanceCriteria.map((criterion, index) => `${index + 1}. ${criterion}`),
@@ -228,15 +286,18 @@ function prompt(contract: ExecutionContract): string {
 
 /** Run exactly one Codex turn and independently verify its working-tree result. */
 export async function runWorker(contract: ExecutionContract, assignment: Assignment, options: WorkerOptions): Promise<WorkerReport> {
-  if (assignment.runtime !== 'codex') throw new ProtocolError(`M3 supports only the Codex runtime, not ${assignment.runtime}`);
+  if (assignment.runtime !== 'codex') throw new ProtocolError(`The worker supports only the Codex runtime, not ${assignment.runtime}`);
   const turnTimeoutSeconds = options.turnTimeoutSeconds ?? 900;
   if (!Number.isSafeInteger(turnTimeoutSeconds) || turnTimeoutSeconds < 1 || turnTimeoutSeconds > 3600) throw new ProtocolError('Turn timeout must be an integer between 1 and 3600 seconds');
   const project = await realpath(options.project);
   const info = await lstat(project);
   if (!info.isDirectory() || info.isSymbolicLink()) throw new ProtocolError('Project must be a real directory');
-  const beforeStatus = await git(project, ['status', '--porcelain=v1', '-z', '--untracked-files=all']);
-  if (beforeStatus.length) throw new ProtocolError('M3 requires a clean Git working tree so worker changes can be attributed safely');
-  const beforeHead = (await git(project, ['rev-parse', 'HEAD'], 1024)).toString('utf8').trim();
+  const before = await snapshotProject(project);
+  if (options.expectedBaseline) {
+    if (!sameSnapshot(before, options.expectedBaseline)) throw new ProtocolError('The project no longer matches the expected Orqestra checkpoint');
+  } else if (before.changedFiles.length) {
+    throw new ProtocolError('A clean Git working tree is required so worker changes can be attributed safely');
+  }
   const startedAt = new Date().toISOString();
   const approvals: ApprovalRequest[] = [];
   let activeThread: string | null = null;
@@ -245,6 +306,9 @@ export async function runWorker(contract: ExecutionContract, assignment: Assignm
   let completionResolve!: (value: Record<string, unknown>) => void;
   let completionReject!: (error: Error) => void;
   const completion = new Promise<Record<string, unknown>>((resolve, reject) => { completionResolve = resolve; completionReject = reject; });
+  // Transport failure can precede the point where the turn-completion promise is awaited.
+  // Keep it observed while preserving rejection for the later race.
+  void completion.catch(() => {});
   const executable = options.executable ?? 'codex';
   const diagnostic = await diagnose(executable);
   if (!diagnostic.ready) throw new ProtocolError('Codex prerequisites are not met. Run orqestra doctor --codex <executable> for details.');
@@ -300,21 +364,28 @@ export async function runWorker(contract: ExecutionContract, assignment: Assignm
     if (!observed || !observed.reasoningEfforts.includes(assignment.reasoning)) {
       throw new ProtocolError(`Selected model or reasoning is unavailable: ${assignment.id}/${assignment.reasoning}`);
     }
-    const started = record(await client.request('thread/start', {
+    const threadMethod = options.resumeThreadId ? 'thread/resume' : 'thread/start';
+    const started = record(await client.request(threadMethod, options.resumeThreadId ? {
+      threadId: options.resumeThreadId, model: assignment.id, cwd: project,
+      approvalPolicy: 'on-request', approvalsReviewer: 'user', sandbox: 'workspace-write', serviceName: 'orqestra',
+    } : {
       model: assignment.id, cwd: project, approvalPolicy: 'on-request', approvalsReviewer: 'user',
-      sandbox: 'workspace-write', ephemeral: true, serviceName: 'orqestra',
-    }), 'thread/start response');
-    const thread = record(started.thread, 'thread/start thread');
-    if (typeof thread.id !== 'string' || !thread.id) throw new ProtocolError('thread/start lacks a thread ID');
+      sandbox: 'workspace-write', ephemeral: options.ephemeral ?? true, serviceName: 'orqestra',
+    }), `${threadMethod} response`);
+    const thread = record(started.thread, `${threadMethod} thread`);
+    if (typeof thread.id !== 'string' || !thread.id) throw new ProtocolError(`${threadMethod} lacks a thread ID`);
+    if (options.resumeThreadId && thread.id !== options.resumeThreadId) throw new ProtocolError('thread/resume returned a different thread ID');
     activeThread = threadId = thread.id;
+    await options.onCheckpoint?.({ phase: 'thread-started', threadId });
     const turnStarted = record(await client.request('turn/start', {
-      threadId, input: [{ type: 'text', text: prompt(contract) }], cwd: project,
+      threadId, input: [{ type: 'text', text: prompt(contract, options.repair) }], cwd: project,
       approvalPolicy: 'on-request', approvalsReviewer: 'user', model: assignment.id, effort: assignment.reasoning,
       sandboxPolicy: { type: 'workspaceWrite', writableRoots: [project], networkAccess: false }, summary: 'concise',
     }), 'turn/start response');
     const turn = record(turnStarted.turn, 'turn/start turn');
     if (typeof turn.id !== 'string' || !turn.id) throw new ProtocolError('turn/start lacks a turn ID');
     activeTurn = turnId = turn.id;
+    await options.onCheckpoint?.({ phase: 'turn-started', threadId, turnId });
     if (options.signal?.aborted) abort();
     timer = setTimeout(() => { if (!stopReason) { stopReason = 'timeout'; stopResolve(); } }, turnTimeoutSeconds * 1000);
     const first = await Promise.race([completion.then(value => ({ type: 'completed' as const, value })), stopped.then(() => ({ type: 'stopped' as const }))]);
@@ -335,19 +406,13 @@ export async function runWorker(contract: ExecutionContract, assignment: Assignm
     options.signal?.removeEventListener('abort', abort);
     await client.close();
   }
-  const afterHead = (await git(project, ['rev-parse', 'HEAD'], 1024)).toString('utf8').trim();
-  const statusEvidence = await git(project, ['status', '--porcelain=v1', '-z', '--untracked-files=all']);
-  const diffEvidence = await git(project, ['diff', '--no-ext-diff', '--binary', 'HEAD', '--']);
-  const evidence = await changeEvidence(project, statusEvidence, diffEvidence);
-  const files = evidence.files;
-  const headUnchanged = beforeHead === afterHead;
+  const after = await snapshotProject(project);
+  const files = after.changedFiles;
+  const headUnchanged = before.head === after.head;
   const verification: CommandResult[] = [];
   if (workerTurnStatus === 'completed' && headUnchanged && files.length && !options.signal?.aborted) {
-    for (const check of contract.verification) {
-      const result = await runVerification(project, check, options.signal);
-      verification.push(result);
-      if (result.status !== 'passed') break;
-    }
+    await options.onCheckpoint?.({ phase: 'verification-started', snapshot: after });
+    verification.push(...await verifyContract(project, contract.verification, options.signal));
   }
   let status: WorkerReport['status'];
   if (approvals.length && workerTurnStatus === 'interrupted') status = 'approval-required';
@@ -361,8 +426,8 @@ export async function runWorker(contract: ExecutionContract, assignment: Assignm
     workerError: completedTurn ? redactedTurnError(completedTurn) : null, workerSummary: finalMessage,
     approvals, changes: {
       changedFiles: files, headUnchanged,
-      evidenceSha256: evidence.digest,
-      evidenceBytes: evidence.bytes,
+      evidenceSha256: after.evidenceSha256,
+      evidenceBytes: after.evidenceBytes,
     },
     verification,
     warnings: [

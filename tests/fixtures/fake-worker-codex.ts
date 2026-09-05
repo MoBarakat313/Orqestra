@@ -1,5 +1,5 @@
 import { createInterface } from 'node:readline';
-import { writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const arg = process.argv[2];
@@ -29,20 +29,33 @@ if (arg === '--version') {
       return;
     }
     if (request.method === 'initialize') send({ id: request.id, result: { userAgent: 'worker-fixture' } });
-    else if (request.method === 'account/read') send({ id: request.id, result: { account: { type: 'chatgpt' }, requiresOpenaiAuth: true } });
-    else if (request.method === 'model/list') send({ id: request.id, result: { data: [{ model: 'gpt-5.6-terra', displayName: 'Fixture Terra', supportedReasoningEfforts: [{ reasoningEffort: 'medium' }] }], nextCursor: null } });
-    else if (request.method === 'thread/start') {
+    else if (request.method === 'account/read') {
+      if (scenario === 'exit-during-discovery') process.exit(9);
+      else send({ id: request.id, result: { account: { type: 'chatgpt' }, requiresOpenaiAuth: true } });
+    }
+    else if (request.method === 'model/list') send({ id: request.id, result: { data: scenario === 'model-unavailable' ? [] : [{ model: 'gpt-5.6-terra', displayName: 'Fixture Terra', supportedReasoningEfforts: [{ reasoningEffort: 'medium' }] }], nextCursor: null } });
+    else if (request.method === 'thread/start' || request.method === 'thread/resume') {
+      if (scenario === 'repair-requires-resume' && request.method === 'thread/start' && existsSync(join(cwd, 'result.txt'))) {
+        send({ id: request.id, error: { code: -32000, message: 'repair did not resume' } });
+        return;
+      }
       cwd = String(request.params?.cwd ?? cwd);
       send({ id: request.id, result: { thread: { id: threadId, sessionId: threadId, ephemeral: true } } });
     } else if (request.method === 'turn/start') {
+      if (process.env.ORQESTRA_WORKER_COUNT_FILE) appendFileSync(process.env.ORQESTRA_WORKER_COUNT_FILE, 'turn\n');
       send({ id: request.id, result: { turn: { id: turnId, items: [], status: 'inProgress', error: null } } });
       setTimeout(() => {
         if (scenario === 'exit-after-start') process.exit(9);
+        else if (scenario === 'exit-after-edit') {
+          writeFileSync(join(cwd, 'result.txt'), 'incomplete\n');
+          process.exit(9);
+        }
         else if (scenario === 'approval') {
           send({ id: 'approval-1', method: 'item/commandExecution/requestApproval', params: { threadId, turnId, itemId: 'command-1', startedAtMs: Date.now(), command: 'private-command --safe-preview', cwd, reason: 'fixture approval' } });
         } else if (scenario === 'failure') complete('failed');
         else if (scenario !== 'hang') {
-          writeFileSync(join(cwd, 'result.txt'), 'done\n');
+          const content = scenario.startsWith('repair') && !existsSync(join(cwd, 'result.txt')) ? 'incomplete\n' : 'done\n';
+          writeFileSync(join(cwd, 'result.txt'), content);
           send({ method: 'turn/diff/updated', params: { threadId, turnId, diff: 'fixture diff' } });
           complete('completed');
         }
