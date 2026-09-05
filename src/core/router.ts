@@ -34,6 +34,7 @@ export function planTask(config: Config, task: TaskAssessment, catalog?: Catalog
     catalog ? 'Availability is based on a recorded catalog; recheck before execution.' : 'Model availability and capabilities are declared in configuration and remain unverified.',
     'The main Codex conversation model is unchanged by worker policy.',
   ];
+  if (catalog?.capabilitiesSource === 'configuration') warnings.push('Catalog identities and reasoning were discovered; role capabilities come from configuration, not runtime evaluation.');
   const verification: RoutePlan['verification'] = task.risk === 'high' ? 'critical-review' : task.complexity === 'complex' || task.ambiguity === 'unclear' || task.independentPackages > 1 ? 'targeted-review' : 'focused';
   const base = {
     schemaVersion: 1 as const, mode: 'preview' as const, profile: config.profile, objective: task.objective,

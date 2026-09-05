@@ -135,7 +135,9 @@ export function parseTask(value: unknown): TaskAssessment {
 }
 
 export function parseCatalog(value: unknown): Catalog {
-  const root = object(value, 'catalog', ['schemaVersion', 'observedAt', 'models']);
+  const raw = object(value, 'catalog');
+  const root = object(value, 'catalog', ['schemaVersion', 'observedAt', 'models', ...(Object.hasOwn(raw, 'capabilitiesSource') ? ['capabilitiesSource'] : [])]);
+  if (Object.hasOwn(root, 'capabilitiesSource') && root.capabilitiesSource !== 'configuration') throw new InputError('catalog.capabilitiesSource must be configuration when present');
   const schemaVersion = schema(root.schemaVersion, 'catalog');
   const observedAt = text(root.observedAt, 'catalog.observedAt');
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u.test(observedAt) || !Number.isFinite(Date.parse(observedAt))) {
@@ -151,5 +153,5 @@ export function parseCatalog(value: unknown): Catalog {
     seen.add(key);
     return { id, runtime, reasoningEfforts: strings(model.reasoningEfforts, 'catalog.reasoningEfforts'), capabilities: capabilities(model.capabilities, 'catalog.capabilities') };
   });
-  return { schemaVersion, observedAt, models };
+  return { schemaVersion, observedAt, models, ...(root.capabilitiesSource === 'configuration' ? { capabilitiesSource: 'configuration' as const } : {}) };
 }

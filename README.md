@@ -4,7 +4,7 @@ Configurable orchestration for coding work inside Codex.
 
 Orqestra is being built to choose suitable models, keep worker context focused, and make execution and usage easier to understand. The intended interface is a Codex skill with guided setup, backed by a local helper.
 
-**Status: offline planning foundation.** Configuration, model policies, route previews, a credential-free demo, and CLI diagnostics are implemented. Live worker execution, measured savings, model discovery, and a supported end-user installer are not available yet.
+**Status: development preview.** Configuration, model policies, route previews, an offline demo, read-only Codex model discovery, and project-local skill installation/removal are implemented. Live worker execution and measured savings are not available yet.
 
 ## Direction
 
@@ -42,16 +42,33 @@ The task file contains an **explicit assessment** of complexity, risk, ambiguity
 
 ## Inside Codex
 
-The first planning skill is in [skills/orqestra/SKILL.md](skills/orqestra/SKILL.md). It uses the same helper for previews. Guided skill installation is part of M2/M7. For a developer trial, build and pack the project, install that local package, then install the skill folder through your normal Codex skill workflow. Restart/reload skill discovery as required by your Codex version.
+Install the skill into an existing project after building Orqestra:
 
 ```sh
-npm pack
-# Use the exact .tgz path printed by npm pack:
-npm install --global ./mobarakat313-orqestra-0.1.0-dev.0.tgz
-orqestra demo
+node dist/src/cli.js install-skill --project /absolute/path/to/your-project
 ```
 
-The package is not published to npm. No global installation is performed by the commands in the quickstart above. See [configuration and command documentation](docs/CONFIGURATION.md) for custom models and recorded catalogs.
+Open that project in Codex and ask **`$orqestra preview a plan for my task`**. Reload Codex if the skill does not appear. The installer creates `.agents/skills/orqestra/` with a self-contained helper and requires no global npm installation. Existing skills, project instructions, and Codex settings are preserved. Node.js 22 remains a prerequisite.
+
+To remove an unchanged installation:
+
+```sh
+node dist/src/cli.js uninstall-skill --project /absolute/path/to/your-project
+```
+
+Removal refuses modified files, new artifacts, and unrecognized ownership. Preserve your changes before removing a customized installation. Automatic upgrades are not implemented.
+
+## Discover models
+
+```sh
+node dist/src/cli.js models --json
+node dist/src/cli.js models --config orqestra.config.json --output catalog.json
+node dist/src/cli.js plan --task examples/task.json --catalog catalog.json
+```
+
+Use `--codex /path/to/codex` if the default CLI is incompatible. A native executable or the official package's `bin/codex.js` entrypoint is supported. Model discovery uses the existing runtime/account state; it never requests login or starts a model turn. Account emails and credentials are excluded from reports. The Codex process can maintain its own normal logs/caches.
+
+See [configuration and command documentation](docs/CONFIGURATION.md) and [tested compatibility](docs/COMPATIBILITY.md). The package is not published to npm; source checkout and local `npm pack` installation are development paths.
 
 ## Development
 

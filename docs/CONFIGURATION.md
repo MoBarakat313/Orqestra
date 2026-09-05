@@ -1,6 +1,6 @@
 # Configuration and commands
 
-The helper currently plans work offline. It does not dispatch workers, discover live models, collect usage, or change Codex settings. Examples use `orqestra`; from a source checkout run `npm run build` and substitute `node dist/src/cli.js`.
+The helper plans work offline, discovers Codex models, and installs/removes its project-local skill. It does not dispatch workers, collect usage, or change Codex settings. Examples use `orqestra`; from a source checkout run `npm run build` and substitute `node dist/src/cli.js`. From an installed project skill, use `node <skill-directory>/scripts/orqestra.mjs`.
 
 ## Commands
 
@@ -12,6 +12,10 @@ The helper currently plans work offline. It does not dispatch workers, discover 
 | `orqestra plan --task task.json --catalog catalog.json` | Also filter candidates against a recorded catalog. |
 | `orqestra demo --profile economy` | Show four offline scenarios; write no files and make no model calls. |
 | `orqestra doctor --codex /path/to/codex` | Check version/root help with timeouts; explain missing or incompatible CLI prerequisites. |
+| `orqestra models --codex /path/to/codex` | Read account mode and paginated model IDs/reasoning settings using App Server. No login or model turn. |
+| `orqestra models --config policy.json --output catalog.json` | Export matching configured models with observed reasoning settings. Refuse overwrites. |
+| `orqestra install-skill --project /path/to/project` | Install the skill plus its helper at `.agents/skills/orqestra/`, preserving existing settings and installations. |
+| `orqestra uninstall-skill --project /path/to/project` | Remove an unchanged, manifest-owned skill; reject edits, added artifacts, and symlinked containers. |
 
 All commands accept `--json`. Success output goes to stdout; input/operation errors go to stderr as `{ "error": "..." }` in JSON mode. Failed diagnostics print their structured diagnostic report to stdout and exit 1. Other failed commands also exit 1. Commands reject unrelated flags rather than silently ignoring them.
 
@@ -25,7 +29,7 @@ The router selects the first eligible configured candidate. Later candidates are
 
 New model IDs, runtime names, and reasoning strings can be added through configuration. That proves policy extensibility, not that an execution adapter exists for that runtime. Declared capabilities and prices are not intelligence scores. Prices are intentionally absent from this initial schema.
 
-The starter policies use GPT-5.6 Luna/Terra/Sol and GPT-6 Astra, based on [official model documentation](https://developers.openai.com/api/docs/models). Codex availability and supported reasoning must be rechecked against the actual runtime before future execution. Astra does not declare `none` reasoning in the preset. Presets are editable starting points, not optimal or benchmarked recommendations.
+The starter policies use GPT-5.6 Luna/Terra/Sol and GPT-6 Astra. Reasoning declarations match the observed Codex CLI 0.153.4 catalog described in [COMPATIBILITY.md](COMPATIBILITY.md), including `ultra` for Terra/Sol/Astra and no `none` effort. API settings can differ from Codex settings. Availability and supported reasoning must be rechecked before future execution. Presets are editable starting points, not optimal or benchmarked recommendations; changing a preset does not rewrite existing user configurations.
 
 ## Explicit task assessments
 
@@ -59,6 +63,8 @@ Without a catalog, plans report `availability: "unverified"`. All plans have `mo
 
 An optional JSON snapshot has `schemaVersion: 1`, `observedAt` (UTC ISO timestamp), and `models`. Each entry contains `id`, `runtime`, `reasoningEfforts`, and `capabilities`. An empty model list is valid and makes worker selection fail rather than assume access. The timestamp is shown in the result; a supplied snapshot is not fresh account verification.
 
+Discovery exports additionally set `capabilitiesSource: "configuration"`. Model identities/settings come from `model/list`, while `read`/`code`/`plan`/`review` capabilities come from the selected policy. That endpoint does not measure those role capabilities. Exports include only configured Codex models with a matching observed reasoning setting. Newly discovered IDs are displayed for consideration but never added to policy automatically.
+
 ```json
 {
   "schemaVersion": 1,
@@ -79,3 +85,13 @@ This example is fictitious and does not claim any account access. A catalog must
 ## Schema compatibility
 
 Unknown fields, unsupported versions, missing required fields, duplicate identities/candidates, invalid limits, and unsupported declared role settings are errors. JSON input files must be at most 1 MiB. Future incompatible schemas will need explicit migration; M1 does not silently migrate or rewrite files.
+
+## Discovery and installation boundaries
+
+Discovery preflights the executable, then sends `initialize`, `initialized`, `account/read` with `refreshToken: false`, and bounded `model/list` requests. It rejects malformed responses, unknown IDs, pagination loops, oversized output, timeouts, process failures, and unexpected server action requests. Server error details and stderr are not exposed because they can contain account data. Check the selected runtime's own diagnostics if an early process exit requires investigation.
+
+On Windows, use a native Codex executable or its JavaScript entrypoint when a shell `.cmd` shim cannot be spawned directly. Orqestra does not enable shell evaluation to run shims.
+
+Project installation writes only a new `.agents/skills/orqestra/` directory (and necessary parents). It copies the helper and MIT license, writes a hash manifest, and activates `SKILL.md` last. Failed writes roll back newly created installation content. Installation never overwrites an existing target. Removal verifies all owned file hashes and rejects unrecognized changes before removing only that skill directory; parent directories, project configuration, and instructions remain.
+
+These preservation checks assume the project is not concurrently modified during installation/removal; they are not an adversarial filesystem sandbox. Automatic updates and arbitrary custom-skill migration remain future work.

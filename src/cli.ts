@@ -5,9 +5,11 @@ import { parseCatalog, parseConfig, parseTask, InputError } from './core/validat
 import { planTask } from './core/router.js';
 import { createPreset } from './presets.js';
 import { diagnose } from './runtime/doctor.js';
+import { catalogFromDiscovery, discoverModels } from './runtime/discovery.js';
+import { installSkill, uninstallSkill } from './runtime/skill-install.js';
 import type { Profile, RoutePlan } from './core/types.js';
 
-const HELP = `Orqestra — offline policy foundation
+const HELP = `Orqestra — policy previews and Codex discovery
 
 Usage:
   orqestra init [--profile economy|balanced|quality] [--config <path>]
@@ -15,10 +17,15 @@ Usage:
   orqestra plan --task <assessment.json> [--config <path>] [--catalog <path>]
   orqestra demo [--profile economy|balanced|quality]
   orqestra doctor [--codex <executable>]
+  orqestra models [--codex <executable>] [--output <catalog.json> --config <path>]
+  orqestra install-skill --project <directory>
+  orqestra uninstall-skill --project <directory>
 
 All commands support --json. Default config: ./orqestra.config.json
-Plans are previews. No command starts a model turn or changes Codex settings.
-Live execution and automatic skill installation are planned, not implemented.
+Plans are previews. models contacts the Codex runtime for account mode and model discovery.
+No command starts a model turn or changes Codex settings.
+Skill installation is project-local and preserves existing installations/settings.
+Live worker execution is planned, not implemented.
 `;
 
 async function readJson(path: string): Promise<unknown> {
@@ -60,6 +67,8 @@ async function main(): Promise<void> {
     options: {
       config: { type: 'string' }, profile: { type: 'string' }, task: { type: 'string' },
       catalog: { type: 'string' }, codex: { type: 'string' }, json: { type: 'boolean' },
+      output: { type: 'string' },
+      project: { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },
     allowPositionals: true, strict: true,
@@ -68,7 +77,8 @@ async function main(): Promise<void> {
   if (positionals.length !== 1) throw new InputError('Expected one command; use --help for usage.');
   const command = positionals[0]!;
   const allowed: Record<string, string[]> = {
-    init: ['profile', 'config'], validate: ['config'], plan: ['task', 'config', 'catalog'], demo: ['profile'], doctor: ['codex'],
+    init: ['profile', 'config'], validate: ['config'], plan: ['task', 'config', 'catalog'], demo: ['profile'], doctor: ['codex'], models: ['codex', 'output', 'config'],
+    'install-skill': ['project'], 'uninstall-skill': ['project'],
   };
   if (!Object.hasOwn(allowed, command)) throw new InputError(`Unknown command: ${command}. Live execution is not implemented; use --help.`);
   for (const key of Object.keys(values)) {
@@ -104,6 +114,30 @@ async function main(): Promise<void> {
     const report = await diagnose(values.codex);
     emit(report, [`Node: ${report.node.version}`, `Codex: ${report.codex.version ?? 'not detected'} (${report.codex.status})`, ...report.messages, 'Live worker execution is not implemented.'].join('\n'));
     if (!report.ready) process.exitCode = 1;
+  } else if (command === 'models') {
+    if (values.config && !values.output) throw new InputError('--config is only used with --output when exporting a catalog');
+    const config = values.output ? parseConfig(await readJson(configPath)) : undefined;
+    const report = await discoverModels(values.codex);
+    if (values.output && config) {
+      await writeFile(values.output, JSON.stringify(catalogFromDiscovery(report, config), null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+    }
+    emit({ ...report, catalogWritten: values.output ?? null }, [
+      `Codex: ${report.codexVersion} | Account mode: ${report.account.mode}`,
+      `Observed ${report.models.length} models at ${report.observedAt}`,
+      ...report.models.map(model => `  ${model.id}: ${model.reasoningEfforts.join(', ') || 'no supported reasoning settings reported'}`),
+      ...report.warnings.map(warning => `Note: ${warning}`),
+      ...(values.output ? [`Wrote ${values.output}; model roles come from the selected configuration.`] : []),
+      'No model turn was started.',
+    ].join('\n'));
+  } else if (command === 'install-skill' || command === 'uninstall-skill') {
+    if (!values.project) throw new InputError(`${command} requires --project <directory>`);
+    if (command === 'install-skill') {
+      const result = await installSkill(values.project);
+      emit(result, `Installed ${result.installed}. Open the project in Codex and use $orqestra; reload Codex if the skill is not discovered.`);
+    } else {
+      const result = await uninstallSkill(values.project);
+      emit(result, `Removed ${result.removed}. Project instructions, policies, and Codex settings were preserved.`);
+    }
   }
 }
 

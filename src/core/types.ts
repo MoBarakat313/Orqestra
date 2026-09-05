@@ -40,6 +40,7 @@ export interface TaskAssessment {
 export interface Catalog {
   schemaVersion: 1;
   observedAt: string;
+  capabilitiesSource?: 'configuration';
   models: Array<{
     id: string;
     runtime: string;

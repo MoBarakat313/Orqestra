@@ -4,10 +4,10 @@ import type { Candidate, Config, Profile, Role } from './core/types.js';
 export function createPreset(profile: Exclude<Profile, 'custom'> = 'balanced'): Config {
   const efforts = ['low', 'medium', 'high', 'xhigh', 'max'];
   const models: Config['models'] = {
-    economical: { id: 'gpt-5.6-luna', runtime: 'codex', group: 'standard', reasoningEfforts: ['none', ...efforts], capabilities: ['read', 'code', 'plan', 'review'] },
-    balanced: { id: 'gpt-5.6-terra', runtime: 'codex', group: 'standard', reasoningEfforts: ['none', ...efforts], capabilities: ['read', 'code', 'plan', 'review'] },
-    senior: { id: 'gpt-5.6-sol', runtime: 'codex', group: 'premium', reasoningEfforts: ['none', ...efforts], capabilities: ['read', 'code', 'plan', 'review'] },
-    advanced: { id: 'gpt-6-astra', runtime: 'codex', group: 'premium', reasoningEfforts: [...efforts], capabilities: ['read', 'code', 'plan', 'review'] },
+    economical: { id: 'gpt-5.6-luna', runtime: 'codex', group: 'standard', reasoningEfforts: [...efforts], capabilities: ['read', 'code', 'plan', 'review'] },
+    balanced: { id: 'gpt-5.6-terra', runtime: 'codex', group: 'standard', reasoningEfforts: [...efforts, 'ultra'], capabilities: ['read', 'code', 'plan', 'review'] },
+    senior: { id: 'gpt-5.6-sol', runtime: 'codex', group: 'premium', reasoningEfforts: [...efforts, 'ultra'], capabilities: ['read', 'code', 'plan', 'review'] },
+    advanced: { id: 'gpt-6-astra', runtime: 'codex', group: 'premium', reasoningEfforts: [...efforts, 'ultra'], capabilities: ['read', 'code', 'plan', 'review'] },
   };
   const candidate = (model: string, reasoning = 'medium'): Candidate => ({ model, reasoning });
   const bindings: Record<Exclude<Profile, 'custom'>, Record<Role, Candidate[]>> = {

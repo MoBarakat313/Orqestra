@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { executableCommand } from './executable.js';
 
 const execute = promisify(execFile);
 
@@ -28,9 +29,10 @@ export async function diagnose(executable = 'codex'): Promise<Diagnostic> {
   if (!supported) result.messages.push('Node.js 22 or newer is required.');
   try {
     const options = { timeout: 5000, maxBuffer: 256 * 1024, windowsHide: true };
-    const { stdout: version } = await execute(executable, ['--version'], options);
+    const { command, prefix } = executableCommand(executable);
+    const { stdout: version } = await execute(command, [...prefix, '--version'], options);
     result.codex.version = version.trim().replace(/[\u0000-\u001f\u007f-\u009f]/gu, '').slice(0, 200);
-    const { stdout: help } = await execute(executable, ['--help'], options);
+    const { stdout: help } = await execute(command, [...prefix, '--help'], options);
     if (advertisesAppServer(help)) {
       result.codex.status = 'detected';
       result.ready = supported;

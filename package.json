@@ -25,7 +25,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "npm run build && node --test dist/tests/core.test.js dist/tests/cli.test.js",
+    "test": "npm run build && node --test dist/tests/core.test.js dist/tests/cli.test.js dist/tests/discovery.test.js dist/tests/skill-install.test.js",
     "check": "npm test",
     "demo": "npm run build && node dist/src/cli.js demo",
     "prepack": "npm run build"

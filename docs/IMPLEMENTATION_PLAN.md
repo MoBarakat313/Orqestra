@@ -18,8 +18,8 @@ Started: 2026-09-05. Product owner: Mohamed Barakat.
 | Milestone | Scope | Acceptance gate | Status |
 | --- | --- | --- | --- |
 | M0 — Repository and plan | README, contribution guidance, license, design records, Git remote | Initial reviewable commit on the provided repository | Complete — initial plan pushed to `main` |
-| M1 — Offline policy foundation | Typed configuration, presets, model selection, explicit task assessment, route preview, demo, CLI tests, CI | Works without credentials; invalid/unsupported configuration fails clearly; reports no invented usage | Complete — 27 local tests passed; CI configured |
-| M2 — Codex compatibility and skill | Diagnostic checks, model discovery over a tested adapter, account-mode awareness, planning skill, project-local installation | Installed runtime is checked before protocol calls; discovery creates no model turn; existing settings preserved; skill works from another project | Started — diagnostic and planning skill landed; live adapter and installation pending |
+| M1 — Offline policy foundation | Typed configuration, presets, model selection, explicit task assessment, route preview, demo, CLI tests, CI | Works without credentials; invalid/unsupported configuration fails clearly; reports no invented usage | Complete — original 27 tests and packaging passed on all CI platforms |
+| M2 — Codex compatibility and skill | Diagnostic checks, model discovery over a tested adapter, account-mode awareness, planning skill, project-local installation | Installed runtime is checked before protocol calls; discovery creates no model turn; existing settings preserved; skill works from another project | Complete — 47 local tests pass; real discovery and skill detection verified on Codex 0.153.4; hosted checks tracked in GitHub Actions |
 | M3 — One verified worker | Context contract, one bounded execution, approval forwarding, cancellation, evidence collection, structured report | Real task succeeds on a disposable fixture repo; failed verification cannot produce success; no permission or billing escalation | Planned |
 | M4 — Durable execution and repair | Persistent run state, typed failures, bounded attempts, checkpoint-aware resume, cancellation cleanup | Restart/cancel/failure fixtures do not duplicate side effects; escalation preserves relevant evidence and useful edits | Planned |
 | M5 — Independent parallel work | Worktree isolation, dependency scheduling, premium/concurrency dispatch limits, integration owner | Conflicting edits do not race; limits hold across failure and cancellation; integrated result is verified | Planned |
@@ -65,13 +65,15 @@ Automatic policy learning, other providers, local inference runtimes, a desktop 
 ## Verification record
 
 - Reference research: 47 upstream lifecycle tests passed; these are not Orqestra tests or savings evidence.
-- `npm run check`: TypeScript compilation and all 27 offline tests passed on macOS with Node.js 22.22.3.
+- M1: TypeScript compilation and 27 offline tests passed on macOS with Node.js 22.22.3, then all three CI platforms.
 - `npm pack --dry-run`: distribution allowlist inspected; no `.references`, credentials, local policy files, test fixtures, or dependency tree included.
 - Local package archive installed into an isolated temporary prefix with installation scripts disabled; its executable successfully ran all four offline demo scenarios from outside the source checkout.
 - Planning skill passed the skill-creator frontmatter/scaffold validator. This is structural validation, not proof of autonomous skill behavior.
 - `doctor --json`: correctly reported local `codex-cli 0.20.0` as incompatible with App Server, with no sign-in, update, or model turn.
-- Linux/macOS/Windows CI matrix configured. Hosted run results will be checked after the implementation push.
+- M1 hosted CI: [run 33981037799](https://github.com/MoBarakat313/Orqestra/actions/runs/33981037799) passed on Linux, macOS, and Windows.
+- M2: added bounded JSONL transport, model/account-mode discovery, catalog provenance, a portable helper entrypoint, and project-local skill install/remove with integrity checks. See [COMPATIBILITY.md](COMPATIBILITY.md) for real runtime evidence and explicit limits.
+- M2 real model discovery and skill listing started zero model turns. All 47 local tests pass; fixture tests cover preservation, rollback, protocol failures, and timeouts. The packaged installer and installed helper worked from an independent temporary project. Hosted checks are available in [GitHub Actions](https://github.com/MoBarakat313/Orqestra/actions).
 
 ## Next work package
 
-M2: implement a bounded stdio protocol client and model discovery against transcript fixtures, then verify against a compatible official CLI in an isolated environment. Cover handshake, malformed output, process exit, request timeout, pagination, unsupported settings, and shutdown. Do not start a model turn during discovery. Add project-local skill installation only after preservation and rollback tests exist.
+M3: implement one bounded worker against a disposable fixture repository. Define the context and acceptance contract, validate runtime/account mode and settings immediately before dispatch, forward approvals without granting them automatically, capture diff/verification evidence, and support cancellation. Start with transcript fixtures; the live gate must show a real verified change and a failed-verification case that never reports success.
