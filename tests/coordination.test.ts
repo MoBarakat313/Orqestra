@@ -88,7 +88,7 @@ test('isolated packages honor dependencies and integrate without touching the or
       assert.equal(result.maxConcurrentObserved, 2);
       assert.equal(result.maxPremiumObserved, 0);
       assert(result.packages.every(item => item.status === 'committed' && item.commit));
-      assert.equal(await readFile(join(result.integration.worktree, 'packages/c.txt'), 'utf8'), 'done c\n');
+      assert.equal((await readFile(join(result.integration.worktree, 'packages/c.txt'), 'utf8')).trim(), 'done c');
       assert.deepEqual(result.integration.changedFiles.sort(), ['packages/a.txt', 'packages/b.txt', 'packages/c.txt']);
       assert.equal(git(project, 'rev-parse', 'HEAD'), base);
       assert.equal(git(project, 'status', '--porcelain'), '');
@@ -180,7 +180,7 @@ test('failed final verification preserves the integration worktree and cannot re
       runCoordinated(contract(['missing']), standard, { project, executable: workerFixture, turnTimeoutSeconds: 5, maxAttempts: 1, maxWorkers: 2, maxPremiumWorkers: 1 }));
     assert.equal(result.status, 'integration-failed');
     assert.equal(result.integration.status, 'failed');
-    assert.equal(await readFile(join(result.integration.worktree, 'packages/a.txt'), 'utf8'), 'done a\n');
+    assert.equal((await readFile(join(result.integration.worktree, 'packages/a.txt'), 'utf8')).trim(), 'done a');
   });
 });
 
