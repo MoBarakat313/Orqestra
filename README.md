@@ -4,7 +4,7 @@ Configurable orchestration for coding work inside Codex.
 
 Orqestra is being built to choose suitable models, keep worker context focused, and make execution and usage easier to understand. The intended interface is a Codex skill with guided setup, backed by a local helper.
 
-**Status: development preview.** Configuration, model policies, route previews, read-only Codex model discovery, project-local skill installation/removal, and durable bounded worker execution are implemented. Parallel work and measured savings are not available yet.
+**Status: development preview.** Configuration, model policies, route previews, read-only Codex model discovery, project-local skill installation/removal, durable bounded worker execution, and isolated multi-package coordination are implemented. Measured savings are not available yet.
 
 ## Direction
 
@@ -36,7 +36,7 @@ node dist/src/cli.js plan --task examples/task.json
 node dist/src/cli.js doctor
 ```
 
-The task file contains an **explicit assessment** of complexity, risk, ambiguity, and independent packages. This version does not inspect a repository or classify a natural-language request automatically. Preview limits are not yet enforced by a dispatcher. A small direct task stays on the current Codex conversation model.
+The task file contains an **explicit assessment** of complexity, risk, ambiguity, and independent packages. This version does not inspect a repository or classify a natural-language request automatically. Execution commands enforce configured attempt and worker limits. A small direct task stays on the current Codex conversation model.
 
 `doctor` checks the installed CLI without starting a model turn or modifying configuration. An old or missing Codex CLI causes a diagnostic exit code of 1; offline planning still works. App Server detection is only a prerequisite check, not a verified integration.
 
@@ -94,6 +94,21 @@ node dist/src/cli.js resume \
 ```
 
 Resume verifies detected edits before starting another turn and reopens the saved Codex thread for any repair. Approval requests are cancelled and reported by the CLI; Orqestra never grants them automatically. See [durable worker execution](docs/EXECUTION.md) for checkpoints, recovery, evidence, and failure behavior.
+
+## Coordinate independent packages
+
+Create a strict multi-package contract from [examples/coordination.json](examples/coordination.json), then run:
+
+```sh
+node dist/src/cli.js coordinate \
+  --request /absolute/path/to/coordination.json \
+  --project /absolute/path/to/project \
+  --config /absolute/path/to/orqestra.config.json
+```
+
+Orqestra creates one detached worktree per package, waits for declared dependencies, enforces total and premium worker limits, commits only verified in-scope package changes, and assembles them in a separate integration worktree. The original checkout remains unchanged. Success requires every final integration check to pass; the report gives the verified worktree path for review.
+
+Use `coordinate-resume` with the reported run ID after a paused transport. Committed packages are not repeated. See [independent parallel work](docs/COORDINATION.md) for contract rules, scheduling, recovery, and integration behavior.
 
 ## Development
 

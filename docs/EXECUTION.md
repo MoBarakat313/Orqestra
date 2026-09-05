@@ -15,7 +15,7 @@ Use `--codex /path/to/codex` to select a compatible executable and `--turn-timeo
 
 The request is strict JSON. See [the example](../examples/execution.json).
 
-- `task` uses the same explicit assessment as `plan`. M4 accepts only a standard `single` route. Direct work stays in the current Codex conversation; planned and coordinated routes arrive in later milestones.
+- `task` uses the same explicit assessment as `plan`. `run` accepts only a standard `single` route. Direct work stays in the current Codex conversation; multi-package work uses the separate M5 [`coordinate`](COORDINATION.md) contract.
 - `acceptanceCriteria` contains 1–20 concrete outcomes supplied to the worker.
 - `verification` contains 1–10 commands. Each command is an argument array, never a shell string, and has a 1–600 second timeout. Commands run sequentially from the project directory and stop after the first failure.
 

@@ -1,6 +1,6 @@
 import { createInterface } from 'node:readline';
-import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { appendFileSync, existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
 
 const arg = process.argv[2];
 if (arg === '--version') {
@@ -43,6 +43,10 @@ if (arg === '--version') {
       send({ id: request.id, result: { thread: { id: threadId, sessionId: threadId, ephemeral: true } } });
     } else if (request.method === 'turn/start') {
       if (process.env.ORQESTRA_WORKER_COUNT_FILE) appendFileSync(process.env.ORQESTRA_WORKER_COUNT_FILE, 'turn\n');
+      const packageId = basename(cwd).replace(/^pkg-/u, '');
+      if (scenario.startsWith('coordinate') && process.env.ORQESTRA_WORKER_EVENTS_FILE) {
+        appendFileSync(process.env.ORQESTRA_WORKER_EVENTS_FILE, `start,${packageId},${Date.now()}\n`);
+      }
       send({ id: request.id, result: { turn: { id: turnId, items: [], status: 'inProgress', error: null } } });
       setTimeout(() => {
         if (scenario === 'exit-after-start') process.exit(9);
@@ -53,6 +57,28 @@ if (arg === '--version') {
         else if (scenario === 'approval') {
           send({ id: 'approval-1', method: 'item/commandExecution/requestApproval', params: { threadId, turnId, itemId: 'command-1', startedAtMs: Date.now(), command: 'private-command --safe-preview', cwd, reason: 'fixture approval' } });
         } else if (scenario === 'failure') complete('failed');
+        else if (scenario === 'rename') {
+          renameSync(join(cwd, 'README.md'), join(cwd, 'result.txt'));
+          send({ method: 'turn/diff/updated', params: { threadId, turnId, diff: 'fixture rename diff' } });
+          complete('completed');
+        }
+        else if (scenario.startsWith('coordinate')) {
+          const failure = process.env.ORQESTRA_FAIL_PACKAGE;
+          const dependency = process.env.ORQESTRA_REQUIRED_DEPENDENCY?.split(':');
+          if (failure === packageId || (dependency?.[0] === packageId && !existsSync(join(cwd, 'packages', `${dependency[1]}.txt`)))) {
+            if (process.env.ORQESTRA_WORKER_EVENTS_FILE) appendFileSync(process.env.ORQESTRA_WORKER_EVENTS_FILE, `end,${packageId},${Date.now()}\n`);
+            complete('failed');
+          } else if (scenario === 'coordinate-hang') {
+            // Wait for turn/interrupt so cancellation behavior can be tested.
+          } else {
+            mkdirSync(join(cwd, 'packages'), { recursive: true });
+            writeFileSync(join(cwd, 'packages', `${packageId}.txt`), `done ${packageId}\n`);
+            if (process.env.ORQESTRA_OUT_OF_SCOPE_PACKAGE === packageId) writeFileSync(join(cwd, 'outside.txt'), 'out of scope\n');
+            if (process.env.ORQESTRA_WORKER_EVENTS_FILE) appendFileSync(process.env.ORQESTRA_WORKER_EVENTS_FILE, `end,${packageId},${Date.now()}\n`);
+            send({ method: 'turn/diff/updated', params: { threadId, turnId, diff: 'fixture coordination diff' } });
+            complete('completed');
+          }
+        }
         else if (scenario !== 'hang') {
           const content = scenario.startsWith('repair') && !existsSync(join(cwd, 'result.txt')) ? 'incomplete\n' : 'done\n';
           writeFileSync(join(cwd, 'result.txt'), content);

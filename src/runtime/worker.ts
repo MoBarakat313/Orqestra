@@ -146,7 +146,11 @@ function statusEntries(status: Buffer): StatusEntry[] {
     const field = fields[index]!;
     if (field.length < 4) throw new ProtocolError('Git returned malformed status evidence');
     entries.push({ code: field.slice(0, 2), path: field.slice(3) });
-    if (field[0] === 'R' || field[0] === 'C' || field[1] === 'R' || field[1] === 'C') index++;
+    if (field[0] === 'R' || field[0] === 'C' || field[1] === 'R' || field[1] === 'C') {
+      const source = fields[++index];
+      if (!source) throw new ProtocolError('Git returned malformed rename evidence');
+      entries.push({ code: 'D ', path: source });
+    }
     if (entries.length > 1000) throw new ProtocolError('Worker changed more than 1000 files');
   }
   return entries;

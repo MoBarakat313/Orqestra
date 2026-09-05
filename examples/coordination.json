@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "task": {
+    "objective": "Implement two independently owned modules and verify them together",
+    "complexity": "complex",
+    "risk": "low",
+    "ambiguity": "clear",
+    "independentPackages": 2
+  },
+  "packages": [
+    {
+      "id": "library",
+      "objective": "Implement the library module",
+      "dependsOn": [],
+      "ownedPaths": ["src/library"],
+      "acceptanceCriteria": ["The library behavior is implemented and tested"],
+      "verification": [
+        {
+          "name": "library tests",
+          "command": ["npm", "test", "--", "library"],
+          "timeoutSeconds": 300
+        }
+      ]
+    },
+    {
+      "id": "cli",
+      "objective": "Implement the CLI module using the library contract",
+      "dependsOn": ["library"],
+      "ownedPaths": ["src/cli", "tests/cli"],
+      "acceptanceCriteria": ["The CLI behavior is implemented and tested"],
+      "verification": [
+        {
+          "name": "CLI tests",
+          "command": ["npm", "test", "--", "cli"],
+          "timeoutSeconds": 300
+        }
+      ]
+    }
+  ],
+  "verification": [
+    {
+      "name": "integrated project tests",
+      "command": ["npm", "test"],
+      "timeoutSeconds": 600
+    }
+  ]
+}

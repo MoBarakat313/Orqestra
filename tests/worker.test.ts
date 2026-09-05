@@ -74,6 +74,14 @@ test('failed verification cannot produce a successful worker report', async () =
   });
 });
 
+test('rename evidence includes both the source and destination paths', async () => {
+  await projectFixture(async project => {
+    const report = await scenario('rename', () => runWorker(contract('fixture'), assignment, { project, executable: workerFixture, turnTimeoutSeconds: 5 }));
+    assert.equal(report.status, 'succeeded');
+    assert.deepEqual([...report.changes.changedFiles].sort(), ['README.md', 'result.txt']);
+  });
+});
+
 test('worker failures expose only a bounded error category and status code', async () => {
   await projectFixture(async project => {
     const report = await scenario('failure', () => runWorker(contract(), assignment, { project, executable: workerFixture, turnTimeoutSeconds: 5 }));

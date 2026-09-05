@@ -56,7 +56,7 @@ Verification is `focused`, `targeted-review`, or `critical-review`. High-risk wo
 
 ## Limits and truthfulness
 
-`maxWorkers` is 1–16, `maxPremiumWorkers` is 0–`maxWorkers`, and `maxAttempts` is 1–5. These are Orqestra schema bounds, not claims about the host platform's limits. M4 enforces `maxAttempts` for the single-worker route; M5 will enforce concurrency limits. Setting premium capacity to zero makes premium candidates ineligible; missing approved alternatives result in an error.
+`maxWorkers` is 1–16, `maxPremiumWorkers` is 0–`maxWorkers`, and `maxAttempts` is 1–5. These are Orqestra schema bounds, not claims about the host platform's limits. Durable execution enforces `maxAttempts`; coordinated execution also enforces total and premium concurrency limits. Setting premium capacity to zero makes premium candidates ineligible; missing approved alternatives result in an error.
 
 Without a catalog, plans report `availability: "unverified"`. All plans have `mode: "preview"` and `usage: null`. None reports avoided tokens, saved allowance, or API dollars. The main Codex session's model is not switched by this helper.
 
@@ -98,3 +98,5 @@ Project installation writes only a new `.agents/skills/orqestra/` directory (and
 These preservation checks assume the project is not concurrently modified during installation/removal; they are not an adversarial filesystem sandbox. Automatic updates and arbitrary custom-skill migration remain future work.
 
 See [durable worker execution](EXECUTION.md) for the strict contract, clean-repository requirement, bounded repair, resume, approval behavior, cancellation, evidence, and success conditions.
+
+See [independent parallel work](COORDINATION.md) for package ownership, dependencies, dispatch limits, integration, and coordinated resume.

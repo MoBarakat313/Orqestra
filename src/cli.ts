@@ -8,10 +8,12 @@ import { diagnose } from './runtime/doctor.js';
 import { catalogFromDiscovery, discoverModels } from './runtime/discovery.js';
 import { installSkill, uninstallSkill } from './runtime/skill-install.js';
 import { parseExecutionContract } from './core/execution.js';
+import { parseCoordinationContract } from './core/coordination.js';
 import { resumeDurable, runDurable, type DurableReport } from './runtime/durable.js';
+import { resumeCoordinated, runCoordinated, type CoordinationReport } from './runtime/coordinator.js';
 import type { Profile, RoutePlan } from './core/types.js';
 
-const HELP = `Orqestra — policy previews and Codex discovery
+const HELP = `Orqestra — policy routing and durable Codex execution
 
 Usage:
   orqestra init [--profile economy|balanced|quality] [--config <path>]
@@ -22,6 +24,8 @@ Usage:
   orqestra models [--codex <executable>] [--output <catalog.json> --config <path>]
   orqestra run --request <execution.json> --project <directory> [--config <path>] [--codex <executable>] [--turn-timeout <seconds>] [--state-dir <directory>]
   orqestra resume --run-id <id> --request <execution.json> --project <directory> [--config <path>] [--codex <executable>] [--turn-timeout <seconds>] [--state-dir <directory>]
+  orqestra coordinate --request <coordination.json> --project <directory> [--config <path>] [--codex <executable>] [--turn-timeout <seconds>]
+  orqestra coordinate-resume --run-id <id> --request <coordination.json> --project <directory> [--config <path>] [--codex <executable>] [--turn-timeout <seconds>]
   orqestra install-skill --project <directory>
   orqestra uninstall-skill --project <directory>
 
@@ -29,6 +33,8 @@ All commands support --json. Default config: ./orqestra.config.json
 Plans are previews. models contacts the Codex runtime for account mode and model discovery.
 run starts a durable, bounded worker run for standard, clear, low-risk work and independently verifies its changes.
 resume continues a matching paused checkpoint without repeating a worker whose edits are already present.
+coordinate runs dependency-aware packages in isolated worktrees and verifies their combined result.
+coordinate-resume continues a matching paused coordination checkpoint without redispatching committed packages.
 The worker has project-only write access and no network. Approval requests are cancelled and reported; none are granted automatically.
 Skill installation is project-local and preserves existing installations/settings.
 `;
@@ -97,6 +103,8 @@ async function main(): Promise<void> {
     init: ['profile', 'config'], validate: ['config'], plan: ['task', 'config', 'catalog'], demo: ['profile'], doctor: ['codex'], models: ['codex', 'output', 'config'],
     run: ['request', 'project', 'config', 'codex', 'turn-timeout', 'state-dir'],
     resume: ['run-id', 'request', 'project', 'config', 'codex', 'turn-timeout', 'state-dir'],
+    coordinate: ['request', 'project', 'config', 'codex', 'turn-timeout'],
+    'coordinate-resume': ['run-id', 'request', 'project', 'config', 'codex', 'turn-timeout'],
     'install-skill': ['project'], 'uninstall-skill': ['project'],
   };
   if (!Object.hasOwn(allowed, command)) throw new InputError(`Unknown command: ${command}; use --help.`);
@@ -131,7 +139,7 @@ async function main(): Promise<void> {
     emit({ mode: 'offline-demo', plans, usage: null }, plans.map(formatPlan).join('\n\n'));
   } else if (command === 'doctor') {
     const report = await diagnose(values.codex);
-    emit(report, [`Node: ${report.node.version}`, `Codex: ${report.codex.version ?? 'not detected'} (${report.codex.status})`, ...report.messages, 'Durable single-worker execution is implemented; run it only with an explicit acceptance contract.'].join('\n'));
+    emit(report, [`Node: ${report.node.version}`, `Codex: ${report.codex.version ?? 'not detected'} (${report.codex.status})`, ...report.messages, 'Durable worker and isolated coordination execution require explicit acceptance contracts.'].join('\n'));
     if (!report.ready) process.exitCode = 1;
   } else if (command === 'models') {
     if (values.config && !values.output) throw new InputError('--config is only used with --output when exporting a catalog');
@@ -184,6 +192,48 @@ async function main(): Promise<void> {
       ...(report.latestWorker?.verification ?? []).map(check => `Verification ${check.name}: ${check.status}`),
       ...report.warnings.map(warning => `Note: ${warning}`),
       'Usage is not measured in M4.',
+    ].join('\n'));
+    if (report.status !== 'succeeded') process.exitCode = 1;
+  } else if (command === 'coordinate' || command === 'coordinate-resume') {
+    if (!values.request || !values.project) throw new InputError(`${command} requires --request <coordination.json> and --project <directory>`);
+    if (command === 'coordinate-resume' && !values['run-id']) throw new InputError('coordinate-resume requires --run-id <id>');
+    const config = parseConfig(await readJson(configPath));
+    const contract = parseCoordinationContract(await readJson(values.request));
+    const plan = planTask(config, contract.task);
+    if (!['planned', 'coordinated'].includes(plan.route)) throw new InputError(`M5 coordination requires a multi-package planned or coordinated route; this task routes to ${plan.route}`);
+    const assignment = plan.assignments.find(candidate => candidate.role === 'implement');
+    if (!assignment) throw new InputError('The selected plan has no implementation worker');
+    const controller = new AbortController();
+    const abort = (): void => controller.abort();
+    process.once('SIGINT', abort);
+    process.once('SIGTERM', abort);
+    let report: CoordinationReport;
+    try {
+      const options = {
+        project: values.project, maxAttempts: config.limits.maxAttempts,
+        maxWorkers: config.limits.maxWorkers, maxPremiumWorkers: config.limits.maxPremiumWorkers,
+        ...(values.codex ? { executable: values.codex } : {}),
+        turnTimeoutSeconds: boundedInteger(values['turn-timeout'], 900, '--turn-timeout', 1, 3600),
+        signal: controller.signal,
+      };
+      report = command === 'coordinate'
+        ? await runCoordinated(contract, assignment, options)
+        : await resumeCoordinated(values['run-id']!, contract, assignment, options);
+    } finally {
+      process.removeListener('SIGINT', abort);
+      process.removeListener('SIGTERM', abort);
+    }
+    emit(report, [
+      `Orqestra coordination ${report.runId}: ${report.status}`,
+      `Model: ${report.selected.id} (${report.selected.reasoning})`,
+      `Observed concurrency: ${report.maxConcurrentObserved}/${report.limits.maxWorkers}; premium: ${report.maxPremiumObserved}/${report.limits.maxPremiumWorkers}`,
+      `Checkpoint: ${report.statePath}`,
+      ...report.packages.map(item => `Package ${item.id}: ${item.status}${item.commit ? ` (${item.commit.slice(0, 12)})` : ''}`),
+      `Integration owner: ${report.integration.owner} | status: ${report.integration.status}`,
+      `Integration worktree: ${report.integration.worktree}`,
+      ...report.integration.verification.map(check => `Verification ${check.name}: ${check.status}`),
+      ...report.warnings.map(warning => `Note: ${warning}`),
+      'Usage is not measured in M5.',
     ].join('\n'));
     if (report.status !== 'succeeded') process.exitCode = 1;
   } else if (command === 'install-skill' || command === 'uninstall-skill') {
