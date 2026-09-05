@@ -12,12 +12,21 @@ interface Pending {
   timer: ReturnType<typeof setTimeout>;
 }
 
-interface ClientOptions {
+export interface ServerRequest {
+  id: string | number;
+  method: string;
+  params: unknown;
+}
+
+export interface ClientOptions {
   requestTimeoutMs?: number;
   maxMessageBytes?: number;
   maxTotalBytes?: number;
   shutdownMs?: number;
   cwd?: string;
+  onNotification?: (method: string, params: unknown) => void;
+  onServerRequest?: (request: ServerRequest) => Promise<unknown> | unknown;
+  onFailure?: (error: Error) => void;
 }
 
 /** Bounded JSONL transport. Does not implement tools, authentication, or turns. */
@@ -29,6 +38,10 @@ export class StdioClient {
   private readonly maxMessageBytes: number;
   private readonly maxTotalBytes: number;
   private readonly shutdownMs: number;
+  private readonly onNotification: ClientOptions['onNotification'];
+  private readonly onServerRequest: ClientOptions['onServerRequest'];
+  private readonly onFailure: ClientOptions['onFailure'];
+  private readonly serverRequestIds = new Set<string>();
   private failure: Error | undefined;
   private closing: Promise<void> | undefined;
   private nextId = 1;
@@ -40,6 +53,9 @@ export class StdioClient {
     this.maxMessageBytes = options.maxMessageBytes ?? 1024 * 1024;
     this.maxTotalBytes = options.maxTotalBytes ?? 8 * 1024 * 1024;
     this.shutdownMs = options.shutdownMs ?? 300;
+    this.onNotification = options.onNotification;
+    this.onServerRequest = options.onServerRequest;
+    this.onFailure = options.onFailure;
     for (const value of [this.requestTimeoutMs, this.maxMessageBytes, this.maxTotalBytes, this.shutdownMs]) {
       if (!Number.isSafeInteger(value) || value <= 0) throw new ProtocolError('Transport limits must be positive integers');
     }
@@ -107,9 +123,29 @@ export class StdioClient {
     } catch { this.fail(new ProtocolError('Codex emitted malformed JSONL')); return; }
     if (typeof message.method === 'string') {
       if (Object.hasOwn(message, 'id')) {
-        // This read-only client never fulfills server requests or approvals.
-        this.send({ id: message.id, error: { code: -32601, message: 'Orqestra discovery does not support server requests' } });
-        this.fail(new ProtocolError('Codex requested an action unsupported by read-only discovery'));
+        const id = message.id;
+        if ((typeof id !== 'string' && typeof id !== 'number') || (typeof id === 'string' && !id)) {
+          this.fail(new ProtocolError('Codex server request lacks a valid request ID'));
+          return;
+        }
+        const key = `${typeof id}:${String(id)}`;
+        if (this.serverRequestIds.has(key)) { this.fail(new ProtocolError('Codex repeated a server request ID')); return; }
+        this.serverRequestIds.add(key);
+        if (this.serverRequestIds.size > 1000) { this.fail(new ProtocolError('Codex exceeded the server request limit')); return; }
+        if (!this.onServerRequest) {
+          this.send({ id, error: { code: -32601, message: 'Orqestra client does not support this server request' } });
+          this.fail(new ProtocolError('Codex requested an action unsupported by this client'));
+          return;
+        }
+        void Promise.resolve(this.onServerRequest({ id, method: message.method, params: message.params }))
+          .then(result => this.send({ id, result }))
+          .catch(() => {
+            this.send({ id, error: { code: -32000, message: 'Orqestra rejected the server request' } });
+            this.fail(new ProtocolError('Orqestra could not resolve a Codex server request'));
+          });
+      } else {
+        try { this.onNotification?.(message.method, message.params); }
+        catch { this.fail(new ProtocolError('Orqestra notification handler failed')); }
       }
       return;
     }
@@ -131,6 +167,7 @@ export class StdioClient {
   private fail(error: Error): void {
     if (this.failure) return;
     this.failure = error;
+    try { this.onFailure?.(error); } catch { /* The transport error remains authoritative. */ }
     for (const pending of this.pending.values()) { clearTimeout(pending.timer); pending.reject(error); }
     this.pending.clear();
   }

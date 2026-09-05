@@ -7,6 +7,8 @@ import { createPreset } from './presets.js';
 import { diagnose } from './runtime/doctor.js';
 import { catalogFromDiscovery, discoverModels } from './runtime/discovery.js';
 import { installSkill, uninstallSkill } from './runtime/skill-install.js';
+import { parseExecutionContract } from './core/execution.js';
+import { runWorker, type WorkerReport } from './runtime/worker.js';
 import type { Profile, RoutePlan } from './core/types.js';
 
 const HELP = `Orqestra — policy previews and Codex discovery
@@ -18,14 +20,15 @@ Usage:
   orqestra demo [--profile economy|balanced|quality]
   orqestra doctor [--codex <executable>]
   orqestra models [--codex <executable>] [--output <catalog.json> --config <path>]
+  orqestra run --request <execution.json> --project <directory> [--config <path>] [--codex <executable>] [--turn-timeout <seconds>]
   orqestra install-skill --project <directory>
   orqestra uninstall-skill --project <directory>
 
 All commands support --json. Default config: ./orqestra.config.json
 Plans are previews. models contacts the Codex runtime for account mode and model discovery.
-No command starts a model turn or changes Codex settings.
+run starts exactly one model turn for standard, clear, low-risk work and independently verifies its changes.
+The worker has project-only write access and no network. Approval requests are cancelled and reported; none are granted automatically.
 Skill installation is project-local and preserves existing installations/settings.
-Live worker execution is planned, not implemented.
 `;
 
 async function readJson(path: string): Promise<unknown> {
@@ -44,6 +47,14 @@ function profile(value = 'balanced'): Exclude<Profile, 'custom'> {
     throw new InputError('Profile must be economy, balanced, or quality. Edit a generated configuration for a custom policy.');
   }
   return value;
+}
+
+function boundedInteger(value: string | undefined, fallback: number, label: string, minimum: number, maximum: number): number {
+  if (value === undefined) return fallback;
+  if (!/^\d+$/u.test(value)) throw new InputError(`${label} must be an integer between ${minimum} and ${maximum}`);
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < minimum || parsed > maximum) throw new InputError(`${label} must be an integer between ${minimum} and ${maximum}`);
+  return parsed;
 }
 
 function formatPlan(plan: RoutePlan): string {
@@ -69,6 +80,8 @@ async function main(): Promise<void> {
       catalog: { type: 'string' }, codex: { type: 'string' }, json: { type: 'boolean' },
       output: { type: 'string' },
       project: { type: 'string' },
+      request: { type: 'string' },
+      'turn-timeout': { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },
     allowPositionals: true, strict: true,
@@ -78,9 +91,10 @@ async function main(): Promise<void> {
   const command = positionals[0]!;
   const allowed: Record<string, string[]> = {
     init: ['profile', 'config'], validate: ['config'], plan: ['task', 'config', 'catalog'], demo: ['profile'], doctor: ['codex'], models: ['codex', 'output', 'config'],
+    run: ['request', 'project', 'config', 'codex', 'turn-timeout'],
     'install-skill': ['project'], 'uninstall-skill': ['project'],
   };
-  if (!Object.hasOwn(allowed, command)) throw new InputError(`Unknown command: ${command}. Live execution is not implemented; use --help.`);
+  if (!Object.hasOwn(allowed, command)) throw new InputError(`Unknown command: ${command}; use --help.`);
   for (const key of Object.keys(values)) {
     if (!['json', 'help'].includes(key) && !allowed[command]!.includes(key)) throw new InputError(`--${key} is not valid for ${command}`);
   }
@@ -112,7 +126,7 @@ async function main(): Promise<void> {
     emit({ mode: 'offline-demo', plans, usage: null }, plans.map(formatPlan).join('\n\n'));
   } else if (command === 'doctor') {
     const report = await diagnose(values.codex);
-    emit(report, [`Node: ${report.node.version}`, `Codex: ${report.codex.version ?? 'not detected'} (${report.codex.status})`, ...report.messages, 'Live worker execution is not implemented.'].join('\n'));
+    emit(report, [`Node: ${report.node.version}`, `Codex: ${report.codex.version ?? 'not detected'} (${report.codex.status})`, ...report.messages, 'One-worker execution is implemented; run it only with an explicit acceptance contract.'].join('\n'));
     if (!report.ready) process.exitCode = 1;
   } else if (command === 'models') {
     if (values.config && !values.output) throw new InputError('--config is only used with --output when exporting a catalog');
@@ -129,6 +143,38 @@ async function main(): Promise<void> {
       ...(values.output ? [`Wrote ${values.output}; model roles come from the selected configuration.`] : []),
       'No model turn was started.',
     ].join('\n'));
+  } else if (command === 'run') {
+    if (!values.request || !values.project) throw new InputError('run requires --request <execution.json> and --project <directory>');
+    const config = parseConfig(await readJson(configPath));
+    const contract = parseExecutionContract(await readJson(values.request));
+    const plan = planTask(config, contract.task);
+    if (plan.route !== 'single') throw new InputError(`M3 runs only the single-worker route; this task routes to ${plan.route}`);
+    const assignment = plan.assignments.find(candidate => candidate.role === 'implement');
+    if (!assignment) throw new InputError('The selected plan has no implementation worker');
+    const controller = new AbortController();
+    const abort = (): void => controller.abort();
+    process.once('SIGINT', abort);
+    process.once('SIGTERM', abort);
+    let report: WorkerReport;
+    try {
+      report = await runWorker(contract, assignment, {
+        project: values.project, ...(values.codex ? { executable: values.codex } : {}),
+        turnTimeoutSeconds: boundedInteger(values['turn-timeout'], 900, '--turn-timeout', 1, 3600),
+        signal: controller.signal,
+      });
+    } finally {
+      process.removeListener('SIGINT', abort);
+      process.removeListener('SIGTERM', abort);
+    }
+    emit(report, [
+      `Orqestra worker: ${report.status}`,
+      `Model: ${report.selected.id} (${report.selected.reasoning}) | attempts: ${report.attempts}`,
+      `Changed files: ${report.changes.changedFiles.join(', ') || 'none'}`,
+      ...report.verification.map(check => `Verification ${check.name}: ${check.status}`),
+      ...report.warnings.map(warning => `Note: ${warning}`),
+      'Usage is not measured in M3.',
+    ].join('\n'));
+    if (report.status !== 'succeeded') process.exitCode = 1;
   } else if (command === 'install-skill' || command === 'uninstall-skill') {
     if (!values.project) throw new InputError(`${command} requires --project <directory>`);
     if (command === 'install-skill') {

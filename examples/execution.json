@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "task": {
+    "objective": "Implement the requested change",
+    "complexity": "standard",
+    "risk": "low",
+    "ambiguity": "clear",
+    "independentPackages": 1
+  },
+  "acceptanceCriteria": [
+    "The requested behavior is implemented",
+    "Existing behavior remains covered by the project checks"
+  ],
+  "verification": [
+    {
+      "name": "project tests",
+      "command": ["npm", "test"],
+      "timeoutSeconds": 300
+    }
+  ]
+}

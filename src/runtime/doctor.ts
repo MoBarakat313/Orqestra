@@ -9,7 +9,7 @@ export interface Diagnostic {
   node: { version: string; supported: boolean };
   codex: { executable: string; version: string | null; status: 'detected' | 'incompatible' | 'unavailable' };
   messages: string[];
-  liveExecutionImplemented: false;
+  liveExecutionImplemented: true;
 }
 
 /** Check root help first: older CLIs can treat unknown subcommands as prompts. */
@@ -24,7 +24,7 @@ export async function diagnose(executable = 'codex'): Promise<Diagnostic> {
     node: { version: process.versions.node, supported },
     codex: { executable, version: null, status: 'unavailable' },
     messages: ['Diagnostics do not sign in, update tools, or start a model turn.'],
-    liveExecutionImplemented: false,
+    liveExecutionImplemented: true,
   };
   if (!supported) result.messages.push('Node.js 22 or newer is required.');
   try {

@@ -4,7 +4,7 @@ Configurable orchestration for coding work inside Codex.
 
 Orqestra is being built to choose suitable models, keep worker context focused, and make execution and usage easier to understand. The intended interface is a Codex skill with guided setup, backed by a local helper.
 
-**Status: development preview.** Configuration, model policies, route previews, an offline demo, read-only Codex model discovery, and project-local skill installation/removal are implemented. Live worker execution and measured savings are not available yet.
+**Status: development preview.** Configuration, model policies, route previews, read-only Codex model discovery, project-local skill installation/removal, and one bounded verified worker are implemented. Parallel work, durable recovery, and measured savings are not available yet.
 
 ## Direction
 
@@ -69,6 +69,19 @@ node dist/src/cli.js plan --task examples/task.json --catalog catalog.json
 Use `--codex /path/to/codex` if the default CLI is incompatible. A native executable or the official package's `bin/codex.js` entrypoint is supported. Model discovery uses the existing runtime/account state; it never requests login or starts a model turn. Account emails and credentials are excluded from reports. The Codex process can maintain its own normal logs/caches.
 
 See [configuration and command documentation](docs/CONFIGURATION.md) and [tested compatibility](docs/COMPATIBILITY.md). The package is not published to npm; source checkout and local `npm pack` installation are development paths.
+
+## Run one verified worker
+
+Create an execution contract from [examples/execution.json](examples/execution.json), use a disposable clean Git repository or worktree, then run:
+
+```sh
+node dist/src/cli.js run \
+  --request /absolute/path/to/execution.json \
+  --project /absolute/path/to/project \
+  --config /absolute/path/to/orqestra.config.json
+```
+
+This starts one Codex turn with project-only writes and no network, then runs the declared checks independently. Every check must pass before the result says `succeeded`. Approval requests are cancelled and reported by the CLI; Orqestra never grants them automatically. See [one-worker execution](docs/EXECUTION.md) for the contract, evidence, and failure behavior.
 
 ## Development
 

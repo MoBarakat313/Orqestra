@@ -1,6 +1,6 @@
 # Configuration and commands
 
-The helper plans work offline, discovers Codex models, and installs/removes its project-local skill. It does not dispatch workers, collect usage, or change Codex settings. Examples use `orqestra`; from a source checkout run `npm run build` and substitute `node dist/src/cli.js`. From an installed project skill, use `node <skill-directory>/scripts/orqestra.mjs`.
+The helper plans work offline, discovers Codex models, runs one bounded verified worker, and installs/removes its project-local skill. It does not run parallel workers, collect usage, or change Codex settings. Examples use `orqestra`; from a source checkout run `npm run build` and substitute `node dist/src/cli.js`. From an installed project skill, use `node <skill-directory>/scripts/orqestra.mjs`.
 
 ## Commands
 
@@ -14,6 +14,7 @@ The helper plans work offline, discovers Codex models, and installs/removes its 
 | `orqestra doctor --codex /path/to/codex` | Check version/root help with timeouts; explain missing or incompatible CLI prerequisites. |
 | `orqestra models --codex /path/to/codex` | Read account mode and paginated model IDs/reasoning settings using App Server. No login or model turn. |
 | `orqestra models --config policy.json --output catalog.json` | Export matching configured models with observed reasoning settings. Refuse overwrites. |
+| `orqestra run --request execution.json --project /path --config policy.json` | Start one standard implementation worker and independently run every declared acceptance command. |
 | `orqestra install-skill --project /path/to/project` | Install the skill plus its helper at `.agents/skills/orqestra/`, preserving existing settings and installations. |
 | `orqestra uninstall-skill --project /path/to/project` | Remove an unchanged, manifest-owned skill; reject edits, added artifacts, and symlinked containers. |
 
@@ -95,3 +96,5 @@ On Windows, use a native Codex executable or its JavaScript entrypoint when a sh
 Project installation writes only a new `.agents/skills/orqestra/` directory (and necessary parents). It copies the helper and MIT license, writes a hash manifest, and activates `SKILL.md` last. Failed writes roll back newly created installation content. Installation never overwrites an existing target. Removal verifies all owned file hashes and rejects unrecognized changes before removing only that skill directory; parent directories, project configuration, and instructions remain.
 
 These preservation checks assume the project is not concurrently modified during installation/removal; they are not an adversarial filesystem sandbox. Automatic updates and arbitrary custom-skill migration remain future work.
+
+See [one-worker execution](EXECUTION.md) for the strict contract, clean-repository requirement, approval behavior, cancellation, evidence, and success conditions.

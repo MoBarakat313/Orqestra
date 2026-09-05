@@ -59,7 +59,7 @@ test('portable executable preflight and discovery work through a JavaScript CLI 
 
 test('transport rejects malformed output, unknown IDs, and server action requests', async () => {
   for (const [scenario, pattern] of [
-    ['malformed', /malformed JSONL/], ['unknown-id', /unknown or duplicate/], ['server-request', /unsupported by read-only/],
+    ['malformed', /malformed JSONL/], ['unknown-id', /unknown or duplicate/], ['server-request', /unsupported by this client/],
   ] as const) {
     const client = fixtureClient(scenario);
     try { await assert.rejects(client.request('initialize', {}), pattern); }

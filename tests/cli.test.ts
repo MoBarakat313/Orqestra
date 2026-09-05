@@ -97,7 +97,7 @@ test('doctor handles missing executables without attempting installation or sign
     assert.equal(result.status, 1);
     const report = JSON.parse(result.stdout);
     assert.equal(report.codex.status, 'unavailable');
-    assert.equal(report.liveExecutionImplemented, false);
+    assert.equal(report.liveExecutionImplemented, true);
     assert.deepEqual(await readdir(cwd), []);
   });
 });
