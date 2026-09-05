@@ -1,0 +1,37 @@
+{
+  "name": "@mobarakat313/orqestra",
+  "version": "0.1.0-dev.0",
+  "description": "Configurable orchestration for coding work inside Codex",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "orqestra": "dist/src/cli.js"
+  },
+  "files": [
+    "dist/src",
+    "skills",
+    "examples",
+    "docs",
+    "CONTRIBUTING.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MoBarakat313/Orqestra.git"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist/tests/core.test.js dist/tests/cli.test.js",
+    "check": "npm test",
+    "demo": "npm run build && node dist/src/cli.js demo",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.1",
+    "typescript": "5.9.3"
+  }
+}

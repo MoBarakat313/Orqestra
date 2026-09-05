@@ -1,6 +1,6 @@
 # Orqestra: research and proposed direction
 
-Status: discussion draft, not an implemented product or an approved specification.
+Status: historical discussion draft. Implementation has started; see [the implementation plan](IMPLEMENTATION_PLAN.md) for current scope and verified progress.
 Reviewed: 2026-09-05.
 
 ## Product intent
@@ -124,4 +124,4 @@ Defer automatic policy learning, a large specialist catalog, full multi-provider
 3. Default profile: Economy or Balanced? Recommend Balanced initially while collecting evidence.
 4. Scope: coding repositories first? Recommend yes.
 
-No application implementation, upstream installation, GitHub publication, or performance claim has been made by this research step.
+The original research step did not install upstream code or make performance claims. Later implementation and GitHub publication are tracked in the implementation plan.
