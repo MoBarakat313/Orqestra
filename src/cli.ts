@@ -6,7 +6,7 @@ import { planTask } from './core/router.js';
 import { createPreset } from './presets.js';
 import { diagnose } from './runtime/doctor.js';
 import { catalogFromDiscovery, discoverModels } from './runtime/discovery.js';
-import { installSkill, uninstallSkill } from './runtime/skill-install.js';
+import { installSkill, skillStatus, uninstallSkill, upgradeSkill } from './runtime/skill-install.js';
 import { parseExecutionContract } from './core/execution.js';
 import { parseCoordinationContract } from './core/coordination.js';
 import { resumeDurable, runDurable, type DurableReport } from './runtime/durable.js';
@@ -15,11 +15,17 @@ import type { Profile, RoutePlan } from './core/types.js';
 import { inspectAccountUsage } from './runtime/accounting.js';
 import { evaluateBenchmark, parseBenchmark } from './core/evaluation.js';
 import type { UsageSummary } from './core/usage.js';
+import { migrateConfigFile } from './runtime/config-migration.js';
+import { setupProject } from './runtime/setup.js';
+import { ORQESTRA_VERSION } from './version.js';
 
 const HELP = `Orqestra — policy routing and durable Codex execution
 
 Usage:
+  orqestra version
+  orqestra setup --project <directory> [--profile economy|balanced|quality]
   orqestra init [--profile economy|balanced|quality] [--config <path>]
+  orqestra migrate-config [--config <path>]
   orqestra validate [--config <path>]
   orqestra plan --task <assessment.json> [--config <path>] [--catalog <path>]
   orqestra demo [--profile economy|balanced|quality]
@@ -32,6 +38,8 @@ Usage:
   orqestra coordinate --request <coordination.json> --project <directory> [--config <path>] [--codex <executable>] [--turn-timeout <seconds>]
   orqestra coordinate-resume --run-id <id> --request <coordination.json> --project <directory> [--config <path>] [--codex <executable>] [--turn-timeout <seconds>]
   orqestra install-skill --project <directory>
+  orqestra skill-status --project <directory>
+  orqestra upgrade-skill --project <directory>
   orqestra uninstall-skill --project <directory>
 
 All commands support --json. Default config: ./orqestra.config.json
@@ -44,6 +52,7 @@ usage reads account-level observations without starting a model turn; ChatGPT ac
 benchmark evaluates recorded direct-Codex and Orqestra pairs with matching task conditions.
 The worker has project-only write access and no network. Approval requests are cancelled and reported; none are granted automatically.
 Skill installation is project-local and preserves existing installations/settings.
+setup creates or migrates the project policy and installs or safely upgrades the project skill.
 `;
 
 async function readJson(path: string): Promise<unknown> {
@@ -117,13 +126,15 @@ async function main(): Promise<void> {
   if (positionals.length !== 1) throw new InputError('Expected one command; use --help for usage.');
   const command = positionals[0]!;
   const allowed: Record<string, string[]> = {
+    version: [], setup: ['project', 'profile'],
     init: ['profile', 'config'], validate: ['config'], plan: ['task', 'config', 'catalog'], demo: ['profile'], doctor: ['codex'], models: ['codex', 'output', 'config'],
+    'migrate-config': ['config'],
     usage: ['codex'], benchmark: ['input'],
     run: ['request', 'project', 'config', 'codex', 'turn-timeout', 'state-dir'],
     resume: ['run-id', 'request', 'project', 'config', 'codex', 'turn-timeout', 'state-dir'],
     coordinate: ['request', 'project', 'config', 'codex', 'turn-timeout'],
     'coordinate-resume': ['run-id', 'request', 'project', 'config', 'codex', 'turn-timeout'],
-    'install-skill': ['project'], 'uninstall-skill': ['project'],
+    'install-skill': ['project'], 'skill-status': ['project'], 'upgrade-skill': ['project'], 'uninstall-skill': ['project'],
   };
   if (!Object.hasOwn(allowed, command)) throw new InputError(`Unknown command: ${command}; use --help.`);
   for (const key of Object.keys(values)) {
@@ -131,10 +142,26 @@ async function main(): Promise<void> {
   }
   const emit = (data: unknown, human: string): void => { console.log(values.json ? JSON.stringify(data, null, 2) : human); };
   const configPath = values.config ?? 'orqestra.config.json';
-  if (command === 'init') {
+  if (command === 'version') {
+    emit({ version: ORQESTRA_VERSION }, ORQESTRA_VERSION);
+  } else if (command === 'setup') {
+    if (!values.project) throw new InputError('setup requires --project <directory>');
+    const result = await setupProject(values.project, profile(values.profile));
+    emit(result, [
+      `Orqestra ${result.version} is ready in ${result.project}.`,
+      `Policy: ${result.config.action} at ${result.config.path}${result.config.backup ? ` (backup: ${result.config.backup})` : ''}`,
+      `Skill: ${result.skill.action} at ${result.skill.path}`,
+      ...result.next,
+    ].join('\n'));
+  } else if (command === 'init') {
     const config = parseConfig(createPreset(profile(values.profile)));
     await writeFile(configPath, JSON.stringify(config, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
     emit({ created: configPath, profile: config.profile, schemaVersion: config.schemaVersion }, `Created ${configPath} (${config.profile}). Existing files and Codex settings were preserved.`);
+  } else if (command === 'migrate-config') {
+    const result = await migrateConfigFile(configPath);
+    emit(result, result.changed
+      ? `Migrated ${result.path} from schema ${result.fromVersion} to ${result.toVersion}. Backup: ${result.backup}`
+      : `${result.path} already uses schema ${result.toVersion}; no files changed.`);
   } else if (command === 'validate') {
     const config = parseConfig(await readJson(configPath));
     emit({ valid: true, profile: config.profile, availability: 'unverified' }, `Configuration is valid (${config.profile}). Account availability is unverified.`);
@@ -216,7 +243,7 @@ async function main(): Promise<void> {
     try {
       const options = {
         project: values.project, ...(values.codex ? { executable: values.codex } : {}),
-        turnTimeoutSeconds: boundedInteger(values['turn-timeout'], 900, '--turn-timeout', 1, 3600),
+        turnTimeoutSeconds: boundedInteger(values['turn-timeout'], config.limits.turnTimeoutSeconds, '--turn-timeout', 1, 3600),
         signal: controller.signal, maxAttempts: plan.maxAttempts,
         ...(values['state-dir'] ? { stateDirectory: values['state-dir'] } : {}),
       };
@@ -256,7 +283,7 @@ async function main(): Promise<void> {
         project: values.project, maxAttempts: config.limits.maxAttempts,
         maxWorkers: config.limits.maxWorkers, maxPremiumWorkers: config.limits.maxPremiumWorkers,
         ...(values.codex ? { executable: values.codex } : {}),
-        turnTimeoutSeconds: boundedInteger(values['turn-timeout'], 900, '--turn-timeout', 1, 3600),
+        turnTimeoutSeconds: boundedInteger(values['turn-timeout'], config.limits.turnTimeoutSeconds, '--turn-timeout', 1, 3600),
         signal: controller.signal,
       };
       report = command === 'coordinate'
@@ -279,11 +306,19 @@ async function main(): Promise<void> {
       ...formatUsage(report.usage),
     ].join('\n'));
     if (report.status !== 'succeeded') process.exitCode = 1;
-  } else if (command === 'install-skill' || command === 'uninstall-skill') {
+  } else if (command === 'install-skill' || command === 'skill-status' || command === 'upgrade-skill' || command === 'uninstall-skill') {
     if (!values.project) throw new InputError(`${command} requires --project <directory>`);
     if (command === 'install-skill') {
       const result = await installSkill(values.project);
-      emit(result, `Installed ${result.installed}. Open the project in Codex and use $orqestra; reload Codex if the skill is not discovered.`);
+      emit(result, `Installed Orqestra ${result.version} at ${result.installed}. Open the project in Codex and use $orqestra; reload Codex if the skill is not discovered.`);
+    } else if (command === 'skill-status') {
+      const result = await skillStatus(values.project);
+      emit(result, result.installed
+        ? `Orqestra skill ${result.version ?? 'legacy'} is installed at ${result.path}${result.current ? ' and is current.' : ' and can be upgraded.'}`
+        : `Orqestra is not installed at ${result.path}.`);
+    } else if (command === 'upgrade-skill') {
+      const result = await upgradeSkill(values.project);
+      emit(result, `Upgraded ${result.upgraded} from ${result.fromVersion ?? 'legacy'} to ${result.toVersion}. Local ownership checks passed.`);
     } else {
       const result = await uninstallSkill(values.project);
       emit(result, `Removed ${result.removed}. Project instructions, policies, and Codex settings were preserved.`);

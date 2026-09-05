@@ -1,6 +1,6 @@
 # Compatibility evidence
 
-Verified on 2026-09-05. This is a bounded record, not a guarantee for every account or installation.
+Verified on 2026-09-06. This is a bounded record, not a guarantee for every account or installation.
 
 | Surface | Version / environment | Result |
 | --- | --- | --- |
@@ -14,6 +14,8 @@ Verified on 2026-09-05. This is a bounded record, not a guarantee for every acco
 | Durable pause/resume | `@openai/codex@0.153.4`, GPT-5.6 Terra/medium, disposable clean Git repository | A restricted discovery exit returned `paused` without crashing; the same run ID resumed under permitted runtime access, created one file, passed two tests, and kept Git history unchanged. |
 | Usage accounting fixtures | Current App Server v2 event shape; Node.js 22 subprocess fixtures | Final token categories, cumulative repair deltas, missing telemetry, account-wide ChatGPT observations, API-key separation, and redaction passed offline tests. |
 | Paired evaluation fixtures | Node.js 22 | Shared task/contract/base conditions, incomplete-pair exclusion, quality/retry totals, and measured-only token/cost differences passed offline tests. |
+| Public alpha archive | `0.1.0-alpha.1`; isolated npm prefix and temporary project on macOS ARM64 | Packed allowlisted files installed without lifecycle scripts or source-checkout dependencies; version, setup, bundled demo, status, staged upgrade, removal, and retained policy all passed. |
+| Configuration migration | Schema 1 to 2 fixtures | Added the bounded turn timeout, retained a byte-identical versioned backup, refused an existing backup, and left current policies unchanged. |
 
 The live account-mode result was ChatGPT. The runtime listed Astra, Sol, Terra, Luna, GPT-5.5, and GPT-5.4 Mini. Only the standard preset families are currently bound by default. Model listing is not proof that a subsequent turn will be authorized, and account access can change.
 
@@ -23,4 +25,4 @@ The first sandboxed discovery attempt exited before completing initialization; t
 
 Source references: [App Server](https://learn.chatgpt.com/docs/app-server), [project skill discovery](https://learn.chatgpt.com/docs/build-skills).
 
-Not yet verified against a real installation: repair through `thread/resume` after a worker has made failing edits, recovery after a forcibly terminated Orqestra process, interactive approval UI, cancellation of a live model turn, M6 usage/account observations, Windows native/shim discovery, or automatic upgrades. Offline subprocess fixtures cover persisted-thread repair, checkpoint recovery, scoped approval forwarding with fail-closed cancellation, `turn/interrupt`, worker/process failures, usage gaps, and failed independent verification. No real direct-versus-Orqestra benchmark has been recorded; one tiny successful worker task does not establish broad model quality or savings.
+Not yet verified against a real installation: repair through `thread/resume` after a worker has made failing edits, recovery after a forcibly terminated Orqestra process, interactive approval UI, cancellation of a live model turn, M6 usage/account observations, or Windows native/shim discovery. Offline subprocess fixtures cover persisted-thread repair, checkpoint recovery, scoped approval forwarding with fail-closed cancellation, `turn/interrupt`, worker/process failures, usage gaps, failed independent verification, configuration migration, and owned skill upgrades. No real direct-versus-Orqestra benchmark has been recorded; one tiny successful worker task does not establish broad model quality or savings.

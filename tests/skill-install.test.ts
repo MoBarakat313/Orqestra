@@ -4,7 +4,8 @@ import { spawnSync } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { buildSkillBundle, installSkill, uninstallSkill } from '../src/runtime/skill-install.js';
+import { buildSkillBundle, installSkill, skillStatus, uninstallSkill, upgradeSkill } from '../src/runtime/skill-install.js';
+import { ORQESTRA_VERSION } from '../src/version.js';
 
 async function fixture(run: (root: string) => Promise<void>) {
   const root = await mkdtemp(join(tmpdir(), 'orqestra-install-test-'));
@@ -118,5 +119,35 @@ test('a bundled project helper can install another independent project copy', as
     const demo = spawnSync(process.execPath, [join(second, 'scripts', 'orqestra.mjs'), 'demo', '--json'], { cwd: other, encoding: 'utf8', timeout: 10000 });
     assert.equal(demo.status, 0, demo.stderr);
     await uninstallSkill(other);
+  });
+});
+
+test('versioned status and staged upgrade accept a pristine legacy manifest', async () => {
+  await fixture(async root => {
+    const { installed } = await installSkill(root);
+    assert.deepEqual(await skillStatus(root), { installed: true, path: installed, version: ORQESTRA_VERSION, current: true });
+    const manifestPath = join(installed, '.orqestra-manifest.json');
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+    manifest.schemaVersion = 1;
+    delete manifest.packageVersion;
+    await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+    assert.equal((await skillStatus(root)).current, false);
+    const result = await upgradeSkill(root);
+    assert.equal(result.fromVersion, null);
+    assert.equal(result.toVersion, ORQESTRA_VERSION);
+    assert.equal((await skillStatus(root)).current, true);
+    assert.deepEqual(await readdir(join(root, '.agents', 'skills')), ['orqestra']);
+  });
+});
+
+test('upgrade refuses modified installs and leaves every artifact untouched', async () => {
+  await fixture(async root => {
+    const { installed } = await installSkill(root);
+    const skill = join(installed, 'SKILL.md');
+    const changed = `${await readFile(skill, 'utf8')}\nKeep my local change\n`;
+    await writeFile(skill, changed);
+    await assert.rejects(upgradeSkill(root), /modified artifact SKILL.md/);
+    assert.equal(await readFile(skill, 'utf8'), changed);
+    assert.deepEqual(await readdir(join(root, '.agents', 'skills')), ['orqestra']);
   });
 });

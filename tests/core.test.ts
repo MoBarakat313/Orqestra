@@ -127,7 +127,7 @@ test('future model IDs and reasoning settings require only validated policy/cata
 });
 
 test('configuration rejects unknown schema and misspelled fields', () => {
-  assert.throws(() => parseConfig({ ...createPreset(), schemaVersion: 2 }), /unsupported schema/);
+  assert.throws(() => parseConfig({ ...createPreset(), schemaVersion: 3 }), /unsupported schema/);
   assert.throws(() => parseConfig({ ...createPreset(), maxWorker: 3 }), /unknown fields/);
   const config = createPreset();
   Object.assign(config.models.balanced!, { pricee: 1 });
@@ -136,7 +136,7 @@ test('configuration rejects unknown schema and misspelled fields', () => {
 
 test('invalid limits cannot slip through as coercible or unbounded values', () => {
   for (const maxWorkers of [0, -1, 1.5, 17, NaN, Infinity, '2', true]) {
-    assert.throws(() => parseConfig({ ...createPreset(), limits: { maxWorkers, maxPremiumWorkers: 0, maxAttempts: 2 } }), /maxWorkers/);
+    assert.throws(() => parseConfig({ ...createPreset(), limits: { maxWorkers, maxPremiumWorkers: 0, maxAttempts: 2, turnTimeoutSeconds: 900 } }), /maxWorkers/);
   }
   const config = createPreset();
   config.limits.maxPremiumWorkers = 3;
@@ -144,6 +144,9 @@ test('invalid limits cannot slip through as coercible or unbounded values', () =
   config.limits.maxPremiumWorkers = 1;
   config.limits.maxAttempts = 0;
   assert.throws(() => parseConfig(config), /maxAttempts/);
+  config.limits.maxAttempts = 2;
+  config.limits.turnTimeoutSeconds = 0;
+  assert.throws(() => parseConfig(config), /turnTimeoutSeconds/);
 });
 
 test('model references, reasoning declarations, and role capabilities are validated', () => {

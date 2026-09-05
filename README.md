@@ -2,9 +2,9 @@
 
 Configurable orchestration for coding work inside Codex.
 
-Orqestra is being built to choose suitable models, keep worker context focused, and make execution and usage easier to understand. The intended interface is a Codex skill with guided setup, backed by a local helper.
+Orqestra chooses suitable models, keeps worker context focused, and makes execution and usage easier to understand. Its first interface is a Codex skill with guided setup, backed by a local helper.
 
-**Status: development preview.** Configuration, model policies, route previews, read-only Codex model discovery, project-local skill installation/removal, durable bounded worker execution, isolated multi-package coordination, measured worker token reports, and paired evaluation are implemented. Published savings claims are not available.
+**Status: public alpha (`0.1.0-alpha.1`).** Configuration, model policies, route previews, read-only Codex model discovery, project-local setup and upgrades, durable bounded worker execution, isolated multi-package coordination, measured worker token reports, and paired evaluation are implemented. Published savings claims are not available.
 
 ## Direction
 
@@ -16,59 +16,59 @@ Orqestra is being built to choose suitable models, keep worker context focused, 
 
 The [research and design discussion](docs/RESEARCH_AND_DIRECTION.md) explains the rationale and what was inspected. The project contains original implementation; third-party reference checkouts are not distributed.
 
-## Try the development preview
+## Install the public alpha
 
-Requires Node.js 22 or newer and npm. No API key or Codex account is needed for the offline demo.
+Requires Node.js 22 or newer and npm. Download the archive and checksum from the [latest release](https://github.com/MoBarakat313/Orqestra/releases/latest), verify the SHA-256 value, then install the archive and set up a project:
 
 ```sh
-git clone https://github.com/MoBarakat313/Orqestra.git
-cd Orqestra
-npm ci
-npm run demo
+npm install --global ./mobarakat313-orqestra-0.1.0-alpha.1.tgz
+orqestra setup --project /absolute/path/to/your-project --profile balanced
 ```
 
-Preview a task using a generated policy:
+Open or reload that project in Codex and ask **`$orqestra preview a plan for my task`**. Setup creates the policy and a self-contained project skill while preserving existing skills, instructions, and Codex settings.
+
+No API key or Codex account is needed for the offline demo:
 
 ```sh
-npm run build
-node dist/src/cli.js init --profile balanced
-node dist/src/cli.js plan --task examples/task.json
-node dist/src/cli.js doctor
+orqestra demo
+orqestra doctor
 ```
 
 The task file contains an **explicit assessment** of complexity, risk, ambiguity, and independent packages. This version does not inspect a repository or classify a natural-language request automatically. Execution commands enforce configured attempt and worker limits. A small direct task stays on the current Codex conversation model.
 
 `doctor` checks the installed CLI without starting a model turn or modifying configuration. An old or missing Codex CLI causes a diagnostic exit code of 1; offline planning still works. App Server detection is only a prerequisite check, not a verified integration.
 
-## Inside Codex
+Full setup, checksum, upgrade, removal, and source instructions are in the [installation guide](docs/INSTALLATION.md).
 
-Install the skill into an existing project after building Orqestra:
+## Manage the project skill
 
-```sh
-node dist/src/cli.js install-skill --project /absolute/path/to/your-project
-```
-
-Open that project in Codex and ask **`$orqestra preview a plan for my task`**. Reload Codex if the skill does not appear. The installer creates `.agents/skills/orqestra/` with a self-contained helper and requires no global npm installation. Existing skills, project instructions, and Codex settings are preserved. Node.js 22 remains a prerequisite.
-
-To remove an unchanged installation:
+Inspect, upgrade, or remove a project installation:
 
 ```sh
-node dist/src/cli.js uninstall-skill --project /absolute/path/to/your-project
+orqestra skill-status --project /absolute/path/to/your-project
+orqestra upgrade-skill --project /absolute/path/to/your-project
+orqestra uninstall-skill --project /absolute/path/to/your-project
 ```
 
-Removal refuses modified files, new artifacts, and unrecognized ownership. Preserve your changes before removing a customized installation. Automatic upgrades are not implemented.
+Upgrades and removal verify every manifest-owned artifact. They refuse local changes, added files, symlinks, or unrecognized ownership rather than overwrite them. A schema 1 policy can be upgraded separately:
+
+```sh
+orqestra migrate-config --config /absolute/path/to/orqestra.config.json
+```
+
+Migration keeps the original as `orqestra.config.json.v1.bak`. Skill removal leaves policies and backups in place.
 
 ## Discover models
 
 ```sh
-node dist/src/cli.js models --json
-node dist/src/cli.js models --config orqestra.config.json --output catalog.json
-node dist/src/cli.js plan --task examples/task.json --catalog catalog.json
+orqestra models --json
+orqestra models --config orqestra.config.json --output catalog.json
+orqestra plan --task examples/task.json --catalog catalog.json
 ```
 
 Use `--codex /path/to/codex` if the default CLI is incompatible. A native executable or the official package's `bin/codex.js` entrypoint is supported. Model discovery uses the existing runtime/account state; it never requests login or starts a model turn. Account emails and credentials are excluded from reports. The Codex process can maintain its own normal logs/caches.
 
-See [configuration and command documentation](docs/CONFIGURATION.md) and [tested compatibility](docs/COMPATIBILITY.md). The package is not published to npm; source checkout and local `npm pack` installation are development paths.
+See [configuration and command documentation](docs/CONFIGURATION.md) and [tested compatibility](docs/COMPATIBILITY.md). The alpha is distributed as a versioned GitHub release archive and is not published to the npm registry.
 
 ## Run a durable verified worker
 

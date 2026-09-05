@@ -24,5 +24,5 @@ export function createPreset(profile: Exclude<Profile, 'custom'> = 'balanced'): 
       plan: [candidate('advanced', 'high')], review: [candidate('advanced', 'high')], escalate: [candidate('advanced', 'high')],
     },
   };
-  return { schemaVersion: 1, profile, models, roles: bindings[profile], limits: { maxWorkers: 2, maxPremiumWorkers: 1, maxAttempts: 2 } };
+  return { schemaVersion: 2, profile, models, roles: bindings[profile], limits: { maxWorkers: 2, maxPremiumWorkers: 1, maxAttempts: 2, turnTimeoutSeconds: 900 } };
 }

@@ -66,7 +66,11 @@ function schema(value: unknown, path: string): 1 {
 
 export function parseConfig(value: unknown): Config {
   const root = object(value, 'config', ['schemaVersion', 'profile', 'models', 'roles', 'limits']);
-  const schemaVersion = schema(root.schemaVersion, 'config');
+  if (root.schemaVersion !== 2) {
+    if (root.schemaVersion === 1) throw new InputError('config: schema version 1 must be migrated with migrate-config');
+    throw new InputError('config: unsupported schema version; expected 2');
+  }
+  const schemaVersion = 2 as const;
   const profile = choice(root.profile, 'profile', ['economy', 'balanced', 'quality', 'custom']);
   const rawModels = object(root.models, 'models');
   if (!Object.keys(rawModels).length) throw new InputError('models must not be empty');
@@ -111,7 +115,7 @@ export function parseConfig(value: unknown): Config {
       return { model, reasoning };
     });
   }
-  const limits = object(root.limits, 'limits', ['maxWorkers', 'maxPremiumWorkers', 'maxAttempts']);
+  const limits = object(root.limits, 'limits', ['maxWorkers', 'maxPremiumWorkers', 'maxAttempts', 'turnTimeoutSeconds']);
   const maxWorkers = integer(limits.maxWorkers, 'limits.maxWorkers', 1, 16);
   return {
     schemaVersion, profile, models, roles,
@@ -119,6 +123,7 @@ export function parseConfig(value: unknown): Config {
       maxWorkers,
       maxPremiumWorkers: integer(limits.maxPremiumWorkers, 'limits.maxPremiumWorkers', 0, maxWorkers),
       maxAttempts: integer(limits.maxAttempts, 'limits.maxAttempts', 1, 5),
+      turnTimeoutSeconds: integer(limits.turnTimeoutSeconds, 'limits.turnTimeoutSeconds', 1, 3600),
     },
   };
 }

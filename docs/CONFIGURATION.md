@@ -1,12 +1,15 @@
 # Configuration and commands
 
-The helper plans work offline, discovers Codex models, runs bounded verified workers, coordinates independent packages, records exposed token usage, evaluates paired benchmark records, and installs/removes its project-local skill. It does not change Codex settings. Examples use `orqestra`; from a source checkout run `npm run build` and substitute `node dist/src/cli.js`. From an installed project skill, use `node <skill-directory>/scripts/orqestra.mjs`.
+The helper plans work offline, discovers Codex models, runs bounded verified workers, coordinates independent packages, records exposed token usage, evaluates paired benchmark records, and manages its project-local skill. It does not change Codex settings. Examples use `orqestra`; from a source checkout run `npm run build` and substitute `node dist/src/cli.js`. From an installed project skill, use `node <skill-directory>/scripts/orqestra.mjs`.
 
 ## Commands
 
 | Command | Behavior |
 | --- | --- |
+| `orqestra version` | Print the installed Orqestra package version. |
+| `orqestra setup --project /path --profile balanced` | Create or migrate the project policy and install, preserve, or safely upgrade its skill. |
 | `orqestra init --profile balanced` | Create `orqestra.config.json` in the current directory; refuse to overwrite any existing file. |
+| `orqestra migrate-config --config policy.json` | Migrate a recognized older policy atomically and retain the original versioned backup. Current policies are unchanged. |
 | `orqestra validate --config policy.json` | Strictly validate configuration and model/role references. Does not establish account availability. |
 | `orqestra plan --task task.json --config policy.json` | Print a route and model-assignment preview from an explicit assessment. |
 | `orqestra plan --task task.json --catalog catalog.json` | Also filter candidates against a recorded catalog. |
@@ -21,6 +24,8 @@ The helper plans work offline, discovers Codex models, runs bounded verified wor
 | `orqestra coordinate --request coordination.json --project /path --config policy.json` | Run independently owned packages in isolated worktrees and verify their integration. |
 | `orqestra coordinate-resume --run-id <id> --request coordination.json --project /path --config policy.json` | Continue matching paused package runs without redispatching committed packages. |
 | `orqestra install-skill --project /path/to/project` | Install the skill plus its helper at `.agents/skills/orqestra/`, preserving existing settings and installations. |
+| `orqestra skill-status --project /path/to/project` | Verify owned artifact hashes and report the installed/current version without writing. |
+| `orqestra upgrade-skill --project /path/to/project` | Verify a pristine owned install, stage the current bundle, and swap it into place. |
 | `orqestra uninstall-skill --project /path/to/project` | Remove an unchanged, manifest-owned skill; reject edits, added artifacts, and symlinked containers. |
 
 All commands accept `--json`. Success output goes to stdout; input/operation errors go to stderr as `{ "error": "..." }` in JSON mode. Failed diagnostics print their structured diagnostic report to stdout and exit 1. Other failed commands also exit 1. Commands reject unrelated flags rather than silently ignoring them.
@@ -61,7 +66,7 @@ Verification is `focused`, `targeted-review`, or `critical-review`. High-risk wo
 
 ## Limits and truthfulness
 
-`maxWorkers` is 1–16, `maxPremiumWorkers` is 0–`maxWorkers`, and `maxAttempts` is 1–5. These are Orqestra schema bounds, not claims about the host platform's limits. Durable execution enforces `maxAttempts`; coordinated execution also enforces total and premium concurrency limits. Setting premium capacity to zero makes premium candidates ineligible; missing approved alternatives result in an error.
+`maxWorkers` is 1–16, `maxPremiumWorkers` is 0–`maxWorkers`, `maxAttempts` is 1–5, and `turnTimeoutSeconds` is 1–3600. These are Orqestra schema bounds, not claims about the host platform's limits. Durable execution enforces `maxAttempts` and the configured turn timeout; `--turn-timeout` is an explicit per-command override. Coordinated execution also enforces total and premium concurrency limits. Setting premium capacity to zero makes premium candidates ineligible; missing approved alternatives result in an error.
 
 Without a catalog, plans report `availability: "unverified"`. All plans have `mode: "preview"` and `usage: null`. None reports avoided tokens, saved allowance, or API dollars. The main Codex session's model is not switched by this helper.
 
@@ -90,7 +95,7 @@ This example is fictitious and does not claim any account access. A catalog must
 
 ## Schema compatibility
 
-Unknown fields, unsupported versions, missing required fields, duplicate identities/candidates, invalid limits, and unsupported declared role settings are errors. JSON input files must be at most 1 MiB. Future incompatible schemas will need explicit migration; M1 does not silently migrate or rewrite files.
+Policy schema 2 adds `limits.turnTimeoutSeconds`. `migrate-config` converts schema 1 to schema 2 with a default of 900 seconds and preserves the exact original in a `.v1.bak` file. `setup` performs the same known migration. Current policies are validated without being rewritten. Unknown fields, unsupported versions, missing required fields, duplicate identities/candidates, invalid limits, and unsupported declared role settings are errors. JSON input files must be at most 1 MiB.
 
 ## Discovery and installation boundaries
 
@@ -98,9 +103,11 @@ Discovery preflights the executable, then sends `initialize`, `initialized`, `ac
 
 On Windows, use a native Codex executable or its JavaScript entrypoint when a shell `.cmd` shim cannot be spawned directly. Orqestra does not enable shell evaluation to run shims.
 
-Project installation writes only a new `.agents/skills/orqestra/` directory (and necessary parents). It copies the helper and MIT license, writes a hash manifest, and activates `SKILL.md` last. Failed writes roll back newly created installation content. Installation never overwrites an existing target. Removal verifies all owned file hashes and rejects unrecognized changes before removing only that skill directory; parent directories, project configuration, and instructions remain.
+Project installation writes only a new `.agents/skills/orqestra/` directory (and necessary parents). It copies the helper and MIT license, writes a versioned hash manifest, and activates `SKILL.md` last. Failed writes roll back newly created installation content. Installation never overwrites an existing target. Upgrade verifies every old artifact, builds a sibling staging directory, swaps it with the old skill, and rolls back the swap if activation fails. Removal applies the same ownership checks before removing only that skill directory; parent directories, project configuration, and instructions remain.
 
-These preservation checks assume the project is not concurrently modified during installation/removal; they are not an adversarial filesystem sandbox. Automatic updates and arbitrary custom-skill migration remain future work.
+These preservation checks assume the project is not concurrently modified during setup, upgrade, or removal; they are not an adversarial filesystem sandbox. Orqestra does not download or apply updates automatically. A newer versioned package must be installed explicitly.
+
+See [public alpha installation](INSTALLATION.md) for release checksums, guided setup, upgrades, and removal.
 
 See [durable worker execution](EXECUTION.md) for the strict contract, clean-repository requirement, bounded repair, resume, approval behavior, cancellation, evidence, and success conditions.
 

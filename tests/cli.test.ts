@@ -111,3 +111,22 @@ test('human previews identify unverified availability and unchanged main model',
     assert.match(result.stdout, /unverified/);
   });
 });
+
+test('version and config migration commands expose the alpha lifecycle', async () => {
+  await fixture(async cwd => {
+    const version = invoke(cwd, 'version', '--json');
+    assert.equal(version.status, 0, version.stderr);
+    assert.equal(JSON.parse(version.stdout).version, '0.1.0-alpha.1');
+    assert.equal(invoke(cwd, 'init').status, 0);
+    const path = join(cwd, 'orqestra.config.json');
+    const legacy = JSON.parse(await readFile(path, 'utf8'));
+    legacy.schemaVersion = 1;
+    delete legacy.limits.turnTimeoutSeconds;
+    await writeFile(path, JSON.stringify(legacy, null, 2) + '\n');
+    const migrated = invoke(cwd, 'migrate-config', '--json');
+    assert.equal(migrated.status, 0, migrated.stderr);
+    assert.equal(JSON.parse(migrated.stdout).changed, true);
+    assert.equal(JSON.parse(await readFile(path, 'utf8')).schemaVersion, 2);
+    assert.equal(JSON.parse(await readFile(`${path}.v1.bak`, 'utf8')).schemaVersion, 1);
+  });
+});

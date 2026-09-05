@@ -17,7 +17,7 @@ export interface Candidate {
 }
 
 export interface Config {
-  schemaVersion: 1;
+  schemaVersion: 2;
   profile: Profile;
   models: Record<string, ModelDeclaration>;
   roles: Record<Role, Candidate[]>;
@@ -25,6 +25,7 @@ export interface Config {
     maxWorkers: number;
     maxPremiumWorkers: number;
     maxAttempts: number;
+    turnTimeoutSeconds: number;
   };
 }
 
