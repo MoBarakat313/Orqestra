@@ -1,4 +1,5 @@
 .references/
+.private/
 .orqestra/
 .env
 .env.*

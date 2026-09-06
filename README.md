@@ -112,7 +112,7 @@ The current alpha keeps repair attempts on the same implementation model and wor
 - Bounded retries, targeted verification, resumable work, and honest usage reporting.
 - Compatibility checks before live execution, with no silent switch from subscription usage to API billing.
 
-The [research and design discussion](docs/RESEARCH_AND_DIRECTION.md) explains the rationale and what was inspected. The project contains original implementation; third-party reference checkouts are not distributed.
+The [public roadmap](https://github.com/MoBarakat313/Orqestra/blob/main/docs/ROADMAP.md) describes the verified alpha, current priorities, and design commitments. The project contains original implementation; third-party reference checkouts are not distributed.
 
 <a id="quick-installation"></a>
 
@@ -253,7 +253,7 @@ npm run check
 npm pack --dry-run
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow and [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for milestone acceptance criteria.
+See [CONTRIBUTING.md](https://github.com/MoBarakat313/Orqestra/blob/main/CONTRIBUTING.md) for the contribution workflow, the [public roadmap](https://github.com/MoBarakat313/Orqestra/blob/main/docs/ROADMAP.md) for current priorities, and [SECURITY.md](https://github.com/MoBarakat313/Orqestra/blob/main/SECURITY.md) for private vulnerability reporting.
 
 ## 📄 License
 

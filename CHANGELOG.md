@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Separated public user guides from private historical planning notes, added a concise public roadmap and security policy, and excluded maintainer-only material from downloadable packages.
 - Added a numbered Codex Desktop setup and usage walkthrough with prompt examples.
 - Added concrete SHA-256 verification commands for macOS, Linux, and Windows PowerShell.
 - Clarified per-project installation, skill discovery, CLI prerequisites, and troubleshooting.

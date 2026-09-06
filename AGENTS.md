@@ -1,6 +1,6 @@
 # Working on Orqestra
 
-Orqestra's first interface is inside Codex, with a small local helper. Read `docs/IMPLEMENTATION_PLAN.md` for current scope and progress.
+Orqestra's first interface is inside Codex, with a small local helper. Read `docs/ROADMAP.md` for current scope and priorities, then read the guide for the behavior you are changing.
 
 - Keep orchestration policies independent of particular model names. Put model-specific defaults in presets and validate them at runtime boundaries.
 - Keep the core deterministic and testable without credentials. Separate planning, dispatch, verification, and reporting.

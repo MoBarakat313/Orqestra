@@ -35,7 +35,27 @@ test('the public archive installs and manages a project outside the source check
     const packed = JSON.parse(runNpm(['pack', '--ignore-scripts', '--json', '--pack-destination', archive], source, cache))[0];
     assert.equal(packed.version, ORQESTRA_VERSION);
     const files = packed.files.map((item: { path: string }) => item.path as string);
-    for (const forbidden of ['.references', '.orqestra', '.env', 'node_modules', 'tests/', 'orqestra.config.json']) {
+    for (const required of [
+      'docs/INSTALLATION.md',
+      'docs/BEGINNER_COMMANDS.md',
+      'docs/CONFIGURATION.md',
+      'docs/COMPATIBILITY.md',
+    ]) assert.equal(files.includes(required), true, `missing public guide: ${required}`);
+    for (const forbidden of [
+      '.references',
+      '.private',
+      '.orqestra',
+      '.env',
+      'node_modules',
+      'tests/',
+      'orqestra.config.json',
+      'docs/IMPLEMENTATION_PLAN.md',
+      'docs/RESEARCH_AND_DIRECTION.md',
+      'docs/ROADMAP.md',
+      'docs/releases',
+      'CONTRIBUTING.md',
+      'SECURITY.md',
+    ]) {
       assert.equal(files.some((path: string) => path === forbidden || path.startsWith(`${forbidden}/`) || path.startsWith(forbidden)), false, forbidden);
     }
     const privatePattern = /\/Users\/|BEGIN (?:RSA|OPENSSH|EC) PRIVATE KEY|\bsk-[A-Za-z0-9_-]{16,}|\bAKIA[0-9A-Z]{16}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/u;
