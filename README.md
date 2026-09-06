@@ -1,12 +1,98 @@
 # Orqestra
 
-Configurable orchestration for coding work inside Codex.
+**Spend Codex effort where it matters.**
 
-Orqestra chooses suitable models, keeps worker context focused, and makes execution and usage easier to understand. Its first interface is a Codex skill with guided setup, backed by a local helper.
+Orqestra is an open-source, configurable orchestrator for coding work inside Codex. It routes each task to the smallest workflow that can handle it responsibly: small work stays in the current conversation, standard work can use one focused worker, and multiple workers are reserved for genuinely independent packages.
 
-**Status: public alpha (`0.1.0-alpha.1`).** Configuration, model policies, route previews, read-only Codex model discovery, project-local setup and upgrades, durable bounded worker execution, isolated multi-package coordination, measured worker token reports, and paired evaluation are implemented. Published savings claims are not available.
+This approach is designed to reduce avoidable model turns and token consumption while keeping verification explicit. You choose the model policy, worker limits, retry limits, and whether a task should remain with one worker or use coordinated packages.
 
-## Direction
+[Quick install](#quick-installation-with-codex) · [How it works](#how-orqestra-works) · [Important commands](#important-commands-for-beginners) · [Manual installation](docs/INSTALLATION.md)
+
+**Status: public alpha (`0.1.0-alpha.1`).** Configuration, model policies, route previews, read-only Codex model discovery, project-local setup and upgrades, durable bounded worker execution, isolated multi-package coordination, measured worker token reports, and paired evaluation are implemented. Token savings depend on the task, policy, and models available to the user; no fixed savings percentage has been established.
+
+## Why Orqestra can use fewer tokens
+
+Orqestra reduces unnecessary orchestration work by changing the execution shape before workers are started:
+
+| Mechanism | How it controls model work |
+| --- | --- |
+| Direct route | Small, clear, low-risk work stays in the current Codex conversation, so no additional worker is started. |
+| Selective delegation | A standard task uses one implementation worker instead of creating a swarm. |
+| Focused contracts | Workers receive the objective, acceptance criteria, allowed scope, and verification commands instead of the entire parent conversation. |
+| Configurable model policy | Economy, Balanced, Quality, and custom policies decide which configured model is eligible for each role. |
+| Hard worker limits | `maxWorkers` and `maxPremiumWorkers` cap active implementation workers. |
+| Bounded retries | `maxAttempts` prevents an open-ended repair loop. |
+| Deterministic checks | Verification commands and coordinated integration run without adding a model turn. |
+| Honest accounting | Reports include worker tokens exposed by Codex and identify missing telemetry instead of estimating it. |
+
+The main Codex conversation remains outside the helper's token visibility. Account-level usage is account-wide, and a preview is not evidence of savings. Orqestra includes a paired benchmark format so future public comparisons can use the same task, Git base, checks, and measured observations.
+
+## How Orqestra works
+
+After installation, Orqestra is available as a project skill. In the current alpha, activate it explicitly by starting the request with `$orqestra`:
+
+```text
+$orqestra assess, plan, and implement CSV export, then verify the result.
+```
+
+A plain request such as `Plan and implement CSV export` is handled as a normal Codex request; Orqestra is not guaranteed to run. Using `$orqestra` makes the routing request explicit.
+
+```mermaid
+flowchart TD
+    A["User sends a $orqestra task"] --> B["Codex records an explicit task assessment"]
+    B --> C{"Orqestra router"}
+
+    C --> D["Direct"]
+    C --> E["Single worker"]
+    C --> F["Planned"]
+    C --> G["Coordinated workers"]
+
+    D --> D1["Current Codex conversation<br/>No additional worker"]
+    E --> E1["One Codex worker<br/>Configured implementation model"]
+    F --> F1["Clarify or complete planning<br/>No implementation yet"]
+    G --> G1["Independent packages in isolated worktrees<br/>Bounded worker concurrency"]
+```
+
+| Route | When it is selected | What runs |
+| --- | --- | --- |
+| **Direct** | The task is small, clear, low-risk, and one package. | The current Codex conversation; zero additional workers. |
+| **Single worker** | The task is standard, clear, low-risk, and one package. | One bounded implementation worker followed by independent verification. |
+| **Planned** | The task is complex, unclear, high-risk, or not ready for safe execution. | Planning and clarification; implementation waits until the contract is clear. |
+| **Coordinated workers** | The task contains two or more independently completable packages with explicit, nonoverlapping ownership. | Bounded package workers in isolated worktrees, followed by deterministic integration and final verification. |
+
+### The user controls the worker strategy
+
+Ask Orqestra to avoid coordination and use no more than one additional worker:
+
+```text
+$orqestra implement this task with no more than one additional worker. Do not coordinate parallel packages.
+```
+
+Set a project-wide limit of one active implementation worker:
+
+```text
+$orqestra set maxWorkers to 1 and maxPremiumWorkers to 1. Change only orqestra.config.json and validate it.
+```
+
+With `maxWorkers` set to `1`, a multi-package coordination contract can still process packages sequentially. To allow parallel work, raise the limit and request coordination:
+
+```text
+$orqestra coordinate these independent packages using no more than 3 workers, then verify their integration.
+```
+
+Orqestra validates the requested shape. It does not force a single-worker execution contract onto an unclear or high-risk task, and it does not invent independent packages just to create more workers.
+
+### Models and workers are separate choices
+
+A worker is a Codex task with its own context. A model is the GPT model assigned to that worker. The policy selects from configured model candidates at the start of a run and checks runtime availability before live execution.
+
+```text
+$orqestra show my available models, then change the implement role to GPT-6 Astra with high reasoning. Validate the policy and show the exact change.
+```
+
+The current alpha keeps repair attempts on the same implementation model and worker thread. Package workers in one coordinated run use the same selected implementation model. It does not silently switch models after a failure, and it never changes the model selected for the main Codex conversation.
+
+## Project direction
 
 - Economy, Balanced, Quality, and custom model policies.
 - Role definitions independent of model names, including GPT-5.6 and GPT-6 Astra presets.
