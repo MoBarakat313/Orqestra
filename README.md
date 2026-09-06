@@ -1,5 +1,6 @@
 # Orqestra
 
+**Route smarter. Build longer.**
 **Spend Codex effort where it matters.**
 
 Orqestra is an open-source, configurable orchestrator for coding work inside Codex. It routes each task to the smallest workflow that can handle it responsibly: small work stays in the current conversation, standard work can use one focused worker, and multiple workers are reserved for genuinely independent packages.
