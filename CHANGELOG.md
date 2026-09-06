@@ -6,6 +6,8 @@
 - Added concrete SHA-256 verification commands for macOS, Linux, and Windows PowerShell.
 - Clarified per-project installation, skill discovery, CLI prerequisites, and troubleshooting.
 - Updated public runtime examples to use the installed `orqestra` executable.
+- Added a one-prompt Codex installation path and a beginner guide covering every alpha command.
+- Added guided `$orqestra` prompts for model-role and execution-limit policy changes with validation.
 
 ## 0.1.0-alpha.1 — 2026-09-06
 

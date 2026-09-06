@@ -16,105 +16,51 @@ Orqestra chooses suitable models, keeps worker context focused, and makes execut
 
 The [research and design discussion](docs/RESEARCH_AND_DIRECTION.md) explains the rationale and what was inspected. The project contains original implementation; third-party reference checkouts are not distributed.
 
-## Use Orqestra in Codex Desktop
+## Quick installation with Codex
 
-The public alpha requires [Node.js 22 or newer](https://nodejs.org/en/download) and npm. Install it once, then run setup in every project where you want Codex to find the Orqestra skill.
-
-### 1. Download, verify, and install
-
-Download `mobarakat313-orqestra-0.1.0-alpha.1.tgz` and `SHA256SUMS.txt` from the [v0.1.0-alpha.1 release](https://github.com/MoBarakat313/Orqestra/releases/tag/v0.1.0-alpha.1).
-
-On macOS, run these commands in the download directory:
-
-```sh
-shasum -a 256 -c SHA256SUMS.txt
-npm install --global ./mobarakat313-orqestra-0.1.0-alpha.1.tgz
-orqestra version
-```
-
-On Linux, replace the first command with `sha256sum -c SHA256SUMS.txt`. On Windows PowerShell, verify and install with:
-
-```powershell
-$archive = ".\mobarakat313-orqestra-0.1.0-alpha.1.tgz"
-$expected = (Get-Content .\SHA256SUMS.txt).Split()[0].ToLower()
-$actual = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLower()
-if ($actual -ne $expected) { throw "SHA-256 checksum does not match" }
-npm install --global $archive
-orqestra version
-```
-
-### 2. Add Orqestra to a project
-
-Use the project's absolute path in a normal terminal or the Codex terminal:
-
-```sh
-orqestra setup --project /absolute/path/to/your-project --profile balanced
-```
-
-Setup creates:
-
-- `orqestra.config.json`, the editable model and execution policy.
-- `.agents/skills/orqestra/`, the self-contained skill that Codex discovers for this project.
-
-Setup preserves existing project instructions, Codex settings, and unrelated skills. It is safe to repeat on a pristine Orqestra installation.
-
-### 3. Open the project in Codex Desktop
-
-Open or reload the project after setup. Orqestra should appear in the Skills section of the Codex sidebar. If it does not appear, reload or restart Codex and run:
-
-```sh
-orqestra skill-status --project /absolute/path/to/your-project
-orqestra doctor
-```
-
-### 4. Ask Codex to use Orqestra
-
-Start the prompt with `$orqestra`. For example:
+The public alpha requires [Node.js 22 or newer](https://nodejs.org/en/download) and npm. Open the project you want to use in Codex Desktop, then paste this as one prompt:
 
 ```text
-$orqestra preview a plan for adding CSV export to this project, including tests.
+Install Orqestra in the project currently open in Codex from the latest release at https://github.com/MoBarakat313/Orqestra/releases.
+
+First check that Node.js 22 or newer and npm are available. If either is missing, stop and explain what I need to install; do not install or upgrade Node.js, npm, or Codex automatically.
+
+Download only the versioned mobarakat313-orqestra-<version>.tgz release asset and SHA256SUMS.txt into a temporary directory. Do not use GitHub's Source code archive. Verify the archive against SHA256SUMS.txt and stop if verification fails.
+
+Install the verified archive globally with npm without sudo. Then run Orqestra setup for the currently open project using the Balanced profile. Verify the installation with skill-status and run doctor. Report a doctor compatibility failure separately; it does not mean that project installation failed.
+
+Preserve all existing project instructions, skills, Codex settings, configuration, and user files. Remove the temporary download files when finished. Report the installed version, files added to the project, doctor result, and whether Codex needs to be reloaded.
 ```
 
-Preview inspects enough project context to assess the task, writes a temporary structured assessment, and explains the proposed route, model roles, verification depth, and assumptions. It does not implement the task.
+The prompt authorizes installation of the verified Orqestra package and setup of the currently open project. Codex should stop and explain the problem if a prerequisite, checksum, package installation, or project integrity check fails. See the [quick-install procedure](docs/QUICK_INSTALL.md) for the expected result.
 
-When the plan is suitable, ask Codex to execute it:
+## Manual installation
 
-```text
-$orqestra implement the CSV export using the Balanced profile and verify the result.
-```
+Prefer to run each command yourself? The [manual installation guide](docs/INSTALLATION.md) has separate macOS, Linux, and Windows PowerShell instructions, including checksum verification, project setup, troubleshooting, upgrades, and removal.
 
-Other useful prompts include:
+After either installation path, open or reload the project. Orqestra should appear in the Skills section of the Codex sidebar. Setup creates `orqestra.config.json` and `.agents/skills/orqestra/` while preserving existing project instructions, Codex settings, and unrelated skills.
 
-```text
-$orqestra show which Codex models are available for this project and validate the policy.
+**Next: [learn the important Orqestra commands](#important-commands-for-beginners).**
 
-$orqestra resume run <run-id> using the same task contract.
+## Important commands for beginners
 
-$orqestra coordinate these independent packages: update the API in packages/api and the client in packages/client, then run the repository checks.
-```
+Use prompts beginning with `$orqestra` in Codex chat. Use commands beginning with `orqestra` in a terminal.
 
-Orqestra keeps a small, clear, low-risk task in the current Codex conversation. A standard clear task can use one bounded worker. Work is coordinated in isolated worktrees only when the packages are independently completable and have explicit, nonoverlapping ownership. Ambiguous or high-risk work stays at planning until its contract is clear.
+| What you want | Paste into Codex |
+| --- | --- |
+| Preview a task safely | `$orqestra preview a plan for adding CSV export, including tests.` |
+| Implement and verify | `$orqestra implement the CSV export using the current project policy and verify the result.` |
+| Check installation health | `$orqestra check this project's installation status and run diagnostics.` |
+| See available models | `$orqestra show the models available to my Codex account and explain the current role assignments. Do not change anything.` |
+| Change a role's model | `$orqestra change the implement role to GPT-6 Astra with high reasoning. Change only orqestra.config.json, validate it, and show the exact change.` |
+| Change worker limits | `$orqestra set this project to at most 3 workers and 1 premium worker. Change only orqestra.config.json and validate it.` |
+| Resume interrupted work | `$orqestra resume run <run-id> using the same task contract.` |
+| Coordinate independent work | `$orqestra coordinate these independent packages: update packages/api and packages/client, then run the repository checks.` |
+| Inspect visible usage | `$orqestra inspect the available account and worker usage information and explain any visibility gaps.` |
 
-### 5. Check prerequisites or try the offline demo
+For model or limit changes, Orqestra first checks the current policy and validates the edited file. The alpha does not have an interactive `configure` terminal command. Configuration declarations do not prove that a model is available, so use model discovery before live execution. Orqestra never changes the model selected for the main Codex conversation.
 
-No API key or Codex account is needed for the helper's offline demo:
-
-```sh
-orqestra demo
-orqestra doctor
-```
-
-`doctor` checks the installed CLI without signing in, starting a model turn, changing configuration, or installing software. When it succeeds, inspect the models exposed by the existing Codex account:
-
-```sh
-orqestra models
-```
-
-Live `run` and `coordinate` commands require a compatible Codex CLI with App Server access through the user's existing account. Codex Desktop being installed does not by itself prove that this CLI is available on `PATH`; `doctor` reports the detected state. The helper's offline demo and route calculation still work when that check fails.
-
-The task assessment remains explicit: this version does not classify an arbitrary natural-language request without Codex first inspecting the project and recording its judgment. Configuration declarations do not prove account availability, and previews are not execution or savings evidence.
-
-Full upgrade, migration, removal, troubleshooting, and source instructions are in the [installation guide](docs/INSTALLATION.md). Codex project-skill discovery is described in the [official skills documentation](https://learn.chatgpt.com/docs/build-skills).
+The [beginner command guide](docs/BEGINNER_COMMANDS.md) explains profiles, model changes, status checks, updates, removal, execution, recovery, usage, and every terminal command included in the alpha.
 
 ## Manage the project skill
 

@@ -2,6 +2,8 @@
 
 Orqestra runs locally and installs its Codex skill inside each project. It does not replace Codex, sign in, change the selected conversation model, or modify Codex settings.
 
+Want Codex to perform the verified setup? Use the [one-prompt quick installation](QUICK_INSTALL.md). Continue below when you prefer to run each installation command yourself.
+
 ## Requirements
 
 - Node.js 22 or newer and npm.
@@ -155,3 +157,5 @@ node dist/src/cli.js setup --project /absolute/path/to/your-project
 ```
 
 Source installation is useful for development. Public alpha release archives are immutable versioned inputs and include a checksum.
+
+**Next: [learn the important Orqestra commands](BEGINNER_COMMANDS.md).**
