@@ -41,43 +41,6 @@ Safe Token means controlling avoidable orchestration work: direct execution for 
 
 The visual is illustrative. It does not show measured token counts or promise a savings percentage. Orqestra does not make GPT-6 Astra consume fewer tokens; it controls where and when configured models and additional workers are used. Actual usage depends on the task, context, policy, retries, available account models, and the telemetry exposed by Codex.
 
-## Reddit post
-
-Suggested title:
-
-```text
-I built Orqestra, an open-source Codex orchestrator for bounded workers and transparent token usage — looking for alpha testers
-```
-
-Suggested post:
-
-```text
-I have been building Orqestra, an open-source orchestration helper that runs inside Codex Desktop with a small local TypeScript CLI.
-
-The idea is to assess each task before creating extra workers. Small work can stay in the current Codex conversation, a clear one-package task can use one focused worker, unclear or higher-risk work can stop for planning, and genuinely independent packages can use bounded coordinated workers.
-
-Orqestra also has configurable model policies. For example, a policy can reserve GPT-6 Astra for selected planning or review decisions while using another available model for bounded routine implementation. Model names are presets rather than hard-coded orchestration logic, so users can adjust policies as Codex models change.
-
-I call the resource-control approach “Safe Token.” It does not make a model consume fewer tokens, and I am not claiming a fixed savings percentage. It aims to reduce avoidable model turns, oversized worker context, unnecessary swarms, and open-ended retries. Reports preserve token categories that Codex exposes and identify visibility gaps instead of estimating missing usage.
-
-This is public alpha software (v0.1.0-alpha.2). The core has automated coverage and the release package is checked on Ubuntu, macOS, and Windows, but I need more real-world testing across different Codex installations, accounts, repositories, and task shapes.
-
-If you would like to help, please try:
-
-1. The one-prompt installation from the README.
-2. `orqestra doctor` and read-only model discovery.
-3. One `$orqestra` route preview.
-4. A small implementation task in a disposable branch or test repository.
-
-Please tell me your OS, Node.js and Codex versions, the sanitized task shape, the route Orqestra selected, what you expected, and any confusing setup or recovery message. Remove credentials, account details, private source, and full Codex logs before sharing feedback.
-
-Repository: https://github.com/MoBarakat313/Orqestra
-Release: https://github.com/MoBarakat313/Orqestra/releases/tag/v0.1.0-alpha.2
-Alpha feedback: https://github.com/MoBarakat313/Orqestra/issues/new?template=alpha-feedback.yml
-
-I would especially value feedback on whether the routing explanation is understandable and whether the installation feels approachable for people who do not work in a terminal every day.
-```
-
 ## What useful alpha feedback includes
 
 - Orqestra version, operating system, Node.js version, and Codex CLI version.

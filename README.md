@@ -36,7 +36,7 @@ $orqestra preview a plan for adding CSV export to one existing package, includin
 
 For a clear, one-package task, the preview should normally recommend a **single-worker** route: one focused implementation worker followed by independent verification. The result can differ when the repository or requested work makes the task unclear, risky, or suitable for direct work.
 
-Want to help test the alpha? The [public launch kit](docs/LAUNCH_KIT.md) includes the Safe Token visual, a reusable routing example, a Reddit post, and a focused alpha-feedback checklist.
+Want to help test the alpha? The [public launch kit](docs/LAUNCH_KIT.md) includes the Safe Token visual, a reusable routing example, and a focused alpha-feedback checklist.
 
 <a id="safe-token"></a>
 
