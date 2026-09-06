@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Improved repository discovery and presentation with a descriptive README title and introduction, status badges, GitHub topics, Discussions, and a dedicated social-preview image.
+
 ## 0.1.0-alpha.2 — 2026-09-06
 
 Public documentation and distribution update. Orqestra runtime behavior is unchanged from `0.1.0-alpha.1`.

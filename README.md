@@ -1,9 +1,17 @@
-# Orqestra
+# Orqestra — Open-source Codex orchestrator
 
 **Route smarter. Build longer.**
+
 **Spend Codex effort where it matters.**
 
-Orqestra is an open-source, configurable orchestrator for coding work inside Codex. It routes each task to the smallest workflow that can handle it responsibly: small work stays in the current conversation, standard work can use one focused worker, and multiple workers are reserved for genuinely independent packages.
+[![CI](https://github.com/MoBarakat313/Orqestra/actions/workflows/ci.yml/badge.svg)](https://github.com/MoBarakat313/Orqestra/actions/workflows/ci.yml)
+[![GitHub release](https://img.shields.io/github/v/release/MoBarakat313/Orqestra?include_prereleases&sort=semver)](https://github.com/MoBarakat313/Orqestra/releases)
+[![MIT license](https://img.shields.io/github/license/MoBarakat313/Orqestra)](LICENSE)
+[![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+
+Orqestra is an open-source Codex orchestrator for model-aware task routing, bounded AI coding agents, verified execution, recovery, and transparent token usage. It works inside Codex Desktop through a project skill and a small local TypeScript helper.
+
+Orqestra routes each coding task to the smallest workflow that can handle it responsibly: small work stays in the current conversation, standard work can use one focused worker, and multiple workers are reserved for genuinely independent packages.
 
 This approach is designed to reduce avoidable model turns and token consumption while keeping verification explicit. You choose the model policy, worker limits, retry limits, and whether a task should remain with one worker or use coordinated packages.
 
