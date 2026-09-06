@@ -80,6 +80,7 @@ Automatic policy learning, other providers, local inference runtimes, a desktop 
 - M6 hosted CI: [run 33990832709](https://github.com/MoBarakat313/Orqestra/actions/runs/33990832709) passed all 90 tests and package dry runs on Linux, macOS, and Windows.
 - M7: versioned `0.1.0-alpha.1`; added guided idempotent setup, manifest-backed status and staged upgrade, configuration schema 1 to 2 migration with a byte-preserving backup, release archive/checksum automation, and an alpha issue template. The archive test installs into an isolated prefix and exercises setup, the bundled helper, status, upgrade, removal, and retained configuration outside the source checkout. Package inspection rejects private-looking content, reference code, credentials, local policies, test fixtures, dependencies, and run state.
 - M7 hosted CI: [run 33992211306](https://github.com/MoBarakat313/Orqestra/actions/runs/33992211306) passed all 99 tests and package dry-runs on Linux, macOS, and Windows. The Windows runner also passed the installed-archive lifecycle through npm's platform-neutral JavaScript entrypoint.
+- Post-M7 documentation: consolidated the public Codex Desktop journey in the README and installation guide, added macOS, Linux, and Windows checksum commands, documented per-project skill discovery and troubleshooting, added natural-language prompt examples, and changed public execution examples to the installed `orqestra` command. No runtime behavior or compatibility claim changed.
 
 ## After the alpha
 

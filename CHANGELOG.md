@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Added a numbered Codex Desktop setup and usage walkthrough with prompt examples.
+- Added concrete SHA-256 verification commands for macOS, Linux, and Windows PowerShell.
+- Clarified per-project installation, skill discovery, CLI prerequisites, and troubleshooting.
+- Updated public runtime examples to use the installed `orqestra` executable.
+
 ## 0.1.0-alpha.1 — 2026-09-06
 
 First public alpha.
