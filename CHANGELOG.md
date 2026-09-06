@@ -8,6 +8,8 @@
 - Updated public runtime examples to use the installed `orqestra` executable.
 - Added a one-prompt Codex installation path and a beginner guide covering every alpha command.
 - Added guided `$orqestra` prompts for model-role and execution-limit policy changes with validation.
+- Added the Orqestra Safe Token explanation and an illustrative Astra versus routed-work comparison graphic.
+- Added restrained visual markers to the README's main navigation and section headings.
 - Added the public README explanation of explicit activation, route selection, worker control, model assignment, and the mechanisms intended to reduce avoidable token use.
 
 ## 0.1.0-alpha.1 — 2026-09-06

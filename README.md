@@ -6,13 +6,23 @@ Orqestra is an open-source, configurable orchestrator for coding work inside Cod
 
 This approach is designed to reduce avoidable model turns and token consumption while keeping verification explicit. You choose the model policy, worker limits, retry limits, and whether a task should remain with one worker or use coordinated packages.
 
-[Quick install](#quick-installation-with-codex) · [How it works](#how-orqestra-works) · [Important commands](#important-commands-for-beginners) · [Manual installation](docs/INSTALLATION.md)
+[🚀 Quick install](#quick-installation) · [🧭 How it works](#how-it-works) · [⌨️ Important commands](#important-commands) · [🧰 Manual installation](docs/INSTALLATION.md)
 
 **Status: public alpha (`0.1.0-alpha.1`).** Configuration, model policies, route previews, read-only Codex model discovery, project-local setup and upgrades, durable bounded worker execution, isolated multi-package coordination, measured worker token reports, and paired evaluation are implemented. Token savings depend on the task, policy, and models available to the user; no fixed savings percentage has been established.
 
-## Why Orqestra can use fewer tokens
+<a id="safe-token"></a>
 
-Orqestra reduces unnecessary orchestration work by changing the execution shape before workers are started:
+## 🛡️ Orqestra Safe Token strategy
+
+The goal is simple: avoid spending flagship reasoning on every step when a smaller route can complete the work responsibly. Orqestra does not make GPT-6 Astra consume fewer tokens. It changes **where and when** a flagship model is used.
+
+An Orqestra policy can reserve Astra for selected planning, review, or escalation decisions while Luna or Terra handles bounded routine implementation. Small work can stay in the current conversation with no added worker at all. The exact assignment remains configurable and is checked against the models available to the user's Codex account.
+
+![Illustrative comparison: using Astra for every step versus routing selected decisions to Astra and bounded routine work to Luna or Terra](https://raw.githubusercontent.com/MoBarakat313/Orqestra/main/.github/assets/orqestra-safe-token-strategy.png)
+
+> **Illustrative routing pattern:** the token blocks show how work is allocated, not measured token counts or a promised savings percentage. Actual consumption depends on the task, context, selected policy, model behavior, retries, and available account models.
+
+Orqestra controls avoidable orchestration work before workers are started:
 
 | Mechanism | How it controls model work |
 | --- | --- |
@@ -25,9 +35,11 @@ Orqestra reduces unnecessary orchestration work by changing the execution shape 
 | Deterministic checks | Verification commands and coordinated integration run without adding a model turn. |
 | Honest accounting | Reports include worker tokens exposed by Codex and identify missing telemetry instead of estimating it. |
 
-The main Codex conversation remains outside the helper's token visibility. Account-level usage is account-wide, and a preview is not evidence of savings. Orqestra includes a paired benchmark format so future public comparisons can use the same task, Git base, checks, and measured observations.
+This is what **Safe Token** means in Orqestra: direct work when sufficient, focused context when a worker helps, explicit use of premium models, bounded concurrency, bounded repair attempts, and deterministic checks that do not start another model turn. The main Codex conversation remains outside the helper's token visibility. Account-level usage is account-wide, and a preview is not evidence of savings. Orqestra includes a paired benchmark format so future public comparisons can use the same task, Git base, checks, and measured observations.
 
-## How Orqestra works
+<a id="how-it-works"></a>
+
+## 🧭 How Orqestra works
 
 After installation, Orqestra is available as a project skill. In the current alpha, activate it explicitly by starting the request with `$orqestra`:
 
@@ -60,7 +72,7 @@ flowchart TD
 | **Planned** | The task is complex, unclear, high-risk, or not ready for safe execution. | Planning and clarification; implementation waits until the contract is clear. |
 | **Coordinated workers** | The task contains two or more independently completable packages with explicit, nonoverlapping ownership. | Bounded package workers in isolated worktrees, followed by deterministic integration and final verification. |
 
-### The user controls the worker strategy
+### 🎛️ The user controls the worker strategy
 
 Ask Orqestra to avoid coordination and use no more than one additional worker:
 
@@ -82,7 +94,7 @@ $orqestra coordinate these independent packages using no more than 3 workers, th
 
 Orqestra validates the requested shape. It does not force a single-worker execution contract onto an unclear or high-risk task, and it does not invent independent packages just to create more workers.
 
-### Models and workers are separate choices
+### 🧠 Models and workers are separate choices
 
 A worker is a Codex task with its own context. A model is the GPT model assigned to that worker. The policy selects from configured model candidates at the start of a run and checks runtime availability before live execution.
 
@@ -92,7 +104,7 @@ $orqestra show my available models, then change the implement role to GPT-6 Astr
 
 The current alpha keeps repair attempts on the same implementation model and worker thread. Package workers in one coordinated run use the same selected implementation model. It does not silently switch models after a failure, and it never changes the model selected for the main Codex conversation.
 
-## Project direction
+## 🗺️ Project direction
 
 - Economy, Balanced, Quality, and custom model policies.
 - Role definitions independent of model names, including GPT-5.6 and GPT-6 Astra presets.
@@ -102,7 +114,9 @@ The current alpha keeps repair attempts on the same implementation model and wor
 
 The [research and design discussion](docs/RESEARCH_AND_DIRECTION.md) explains the rationale and what was inspected. The project contains original implementation; third-party reference checkouts are not distributed.
 
-## Quick installation with Codex
+<a id="quick-installation"></a>
+
+## 🚀 Quick installation with Codex
 
 The public alpha requires [Node.js 22 or newer](https://nodejs.org/en/download) and npm. Open the project you want to use in Codex Desktop, then paste this as one prompt:
 
@@ -120,15 +134,17 @@ Preserve all existing project instructions, skills, Codex settings, configuratio
 
 The prompt authorizes installation of the verified Orqestra package and setup of the currently open project. Codex should stop and explain the problem if a prerequisite, checksum, package installation, or project integrity check fails. See the [quick-install procedure](docs/QUICK_INSTALL.md) for the expected result.
 
-## Manual installation
+## 🧰 Manual installation
 
 Prefer to run each command yourself? The [manual installation guide](docs/INSTALLATION.md) has separate macOS, Linux, and Windows PowerShell instructions, including checksum verification, project setup, troubleshooting, upgrades, and removal.
 
 After either installation path, open or reload the project. Orqestra should appear in the Skills section of the Codex sidebar. Setup creates `orqestra.config.json` and `.agents/skills/orqestra/` while preserving existing project instructions, Codex settings, and unrelated skills.
 
-**Next: [learn the important Orqestra commands](#important-commands-for-beginners).**
+**Next: [learn the important Orqestra commands](#important-commands).**
 
-## Important commands for beginners
+<a id="important-commands"></a>
+
+## ⌨️ Important commands for beginners
 
 Use prompts beginning with `$orqestra` in Codex chat. Use commands beginning with `orqestra` in a terminal.
 
@@ -148,7 +164,7 @@ For model or limit changes, Orqestra first checks the current policy and validat
 
 The [beginner command guide](docs/BEGINNER_COMMANDS.md) explains profiles, model changes, status checks, updates, removal, execution, recovery, usage, and every terminal command included in the alpha.
 
-## Manage the project skill
+## 🔄 Manage the project skill
 
 Inspect, upgrade, or remove a project installation:
 
@@ -166,7 +182,7 @@ orqestra migrate-config --config /absolute/path/to/orqestra.config.json
 
 Migration keeps the original as `orqestra.config.json.v1.bak`. Skill removal leaves policies and backups in place.
 
-## Discover models
+## 🔍 Discover models
 
 ```sh
 orqestra models --json
@@ -178,7 +194,7 @@ Use `--codex /path/to/codex` if the default CLI is incompatible. A native execut
 
 See [configuration and command documentation](docs/CONFIGURATION.md) and [tested compatibility](docs/COMPATIBILITY.md). The alpha is distributed as a versioned GitHub release archive and is not published to the npm registry.
 
-## Run a durable verified worker
+## 🛠️ Run a durable verified worker
 
 Create an execution contract from [examples/execution.json](examples/execution.json), use a disposable clean Git repository or worktree, then run:
 
@@ -203,7 +219,7 @@ orqestra resume \
 
 Resume verifies detected edits before starting another turn and reopens the saved Codex thread for any repair. Approval requests are cancelled and reported by the CLI; Orqestra never grants them automatically. See [durable worker execution](docs/EXECUTION.md) for checkpoints, recovery, evidence, and failure behavior.
 
-## Coordinate independent packages
+## 🧩 Coordinate independent packages
 
 Create a strict multi-package contract from [examples/coordination.json](examples/coordination.json), then run:
 
@@ -218,7 +234,7 @@ Orqestra creates one detached worktree per package, waits for declared dependenc
 
 Use `coordinate-resume` with the reported run ID after a paused transport. Committed packages are not repeated. See [independent parallel work](docs/COORDINATION.md) for contract rules, scheduling, recovery, and integration behavior.
 
-## Inspect usage and evaluate paired runs
+## 📊 Inspect usage and evaluate paired runs
 
 ```sh
 orqestra usage --json
@@ -229,7 +245,7 @@ Worker reports keep input, cached input, cache-write input, output, reasoning-ou
 
 The benchmark command accepts direct Codex and Orqestra observations tied to the same task contract and Git base commit. It reports completion, verification, regressions, retries, elapsed time, and only fully paired measured token or API-cost differences. See [usage accounting and paired evaluation](docs/ACCOUNTING_AND_EVALUATION.md).
 
-## Development
+## 🧪 Development
 
 ```sh
 npm ci
@@ -239,6 +255,6 @@ npm pack --dry-run
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow and [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for milestone acceptance criteria.
 
-## License
+## 📄 License
 
 MIT. See [LICENSE](LICENSE).
