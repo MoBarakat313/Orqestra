@@ -9,7 +9,7 @@ This approach is designed to reduce avoidable model turns and token consumption 
 
 [🚀 Quick install](#quick-installation) · [🧭 How it works](#how-it-works) · [⌨️ Important commands](#important-commands) · [🧰 Manual installation](docs/INSTALLATION.md)
 
-**Status: public alpha (`0.1.0-alpha.1`).** Configuration, model policies, route previews, read-only Codex model discovery, project-local setup and upgrades, durable bounded worker execution, isolated multi-package coordination, measured worker token reports, and paired evaluation are implemented. Token savings depend on the task, policy, and models available to the user; no fixed savings percentage has been established.
+**Status: public alpha (`0.1.0-alpha.2`).** Configuration, model policies, route previews, read-only Codex model discovery, project-local setup and upgrades, durable bounded worker execution, isolated multi-package coordination, measured worker token reports, and paired evaluation are implemented. Token savings depend on the task, policy, and models available to the user; no fixed savings percentage has been established.
 
 <a id="safe-token"></a>
 

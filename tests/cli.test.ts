@@ -116,7 +116,7 @@ test('version and config migration commands expose the alpha lifecycle', async (
   await fixture(async cwd => {
     const version = invoke(cwd, 'version', '--json');
     assert.equal(version.status, 0, version.stderr);
-    assert.equal(JSON.parse(version.stdout).version, '0.1.0-alpha.1');
+    assert.equal(JSON.parse(version.stdout).version, '0.1.0-alpha.2');
     assert.equal(invoke(cwd, 'init').status, 0);
     const path = join(cwd, 'orqestra.config.json');
     const legacy = JSON.parse(await readFile(path, 'utf8'));

@@ -1,6 +1,6 @@
 {
   "name": "@mobarakat313/orqestra",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "description": "Configurable orchestration for coding work inside Codex",
   "license": "MIT",
   "type": "module",

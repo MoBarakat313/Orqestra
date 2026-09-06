@@ -12,13 +12,13 @@ Want Codex to perform the verified setup? Use the [one-prompt quick installation
 
 ## Install a versioned release
 
-Download `mobarakat313-orqestra-0.1.0-alpha.1.tgz` and `SHA256SUMS.txt` from the [v0.1.0-alpha.1 release](https://github.com/MoBarakat313/Orqestra/releases/tag/v0.1.0-alpha.1). Verify that the archive's SHA-256 value matches the checksum file, then install that exact archive:
+Download `mobarakat313-orqestra-0.1.0-alpha.2.tgz` and `SHA256SUMS.txt` from the [v0.1.0-alpha.2 release](https://github.com/MoBarakat313/Orqestra/releases/tag/v0.1.0-alpha.2). Verify that the archive's SHA-256 value matches the checksum file, then install that exact archive:
 
 ### macOS
 
 ```sh
 shasum -a 256 -c SHA256SUMS.txt
-npm install --global ./mobarakat313-orqestra-0.1.0-alpha.1.tgz
+npm install --global ./mobarakat313-orqestra-0.1.0-alpha.2.tgz
 orqestra version
 ```
 
@@ -26,14 +26,14 @@ orqestra version
 
 ```sh
 sha256sum -c SHA256SUMS.txt
-npm install --global ./mobarakat313-orqestra-0.1.0-alpha.1.tgz
+npm install --global ./mobarakat313-orqestra-0.1.0-alpha.2.tgz
 orqestra version
 ```
 
 ### Windows PowerShell
 
 ```powershell
-$archive = ".\mobarakat313-orqestra-0.1.0-alpha.1.tgz"
+$archive = ".\mobarakat313-orqestra-0.1.0-alpha.2.tgz"
 $expected = (Get-Content .\SHA256SUMS.txt).Split()[0].ToLower()
 $actual = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLower()
 if ($actual -ne $expected) { throw "SHA-256 checksum does not match" }

@@ -2,16 +2,16 @@
 
 ## Unreleased
 
-- Separated public user guides from private historical planning notes, added a concise public roadmap and security policy, and excluded maintainer-only material from downloadable packages.
-- Added a numbered Codex Desktop setup and usage walkthrough with prompt examples.
-- Added concrete SHA-256 verification commands for macOS, Linux, and Windows PowerShell.
-- Clarified per-project installation, skill discovery, CLI prerequisites, and troubleshooting.
-- Updated public runtime examples to use the installed `orqestra` executable.
-- Added a one-prompt Codex installation path and a beginner guide covering every alpha command.
-- Added guided `$orqestra` prompts for model-role and execution-limit policy changes with validation.
-- Added the Orqestra Safe Token explanation and an illustrative Astra versus routed-work comparison graphic.
-- Added restrained visual markers to the README's main navigation and section headings.
-- Added the public README explanation of explicit activation, route selection, worker control, model assignment, and the mechanisms intended to reduce avoidable token use.
+## 0.1.0-alpha.2 — 2026-09-06
+
+Public documentation and distribution update. Orqestra runtime behavior is unchanged from `0.1.0-alpha.1`.
+
+- Added a one-prompt verified Codex installation path, a numbered Codex Desktop walkthrough, and a beginner guide covering every alpha command.
+- Added concrete SHA-256 verification commands for macOS, Linux, and Windows PowerShell, plus clearer project setup, skill discovery, CLI prerequisites, upgrades, removal, and troubleshooting.
+- Added guided `$orqestra` prompts for model-role and worker-limit changes with strict validation.
+- Added the Safe Token strategy, an illustrative Astra routing comparison, and a clearer explanation of activation, route selection, worker control, and model assignment without claiming a fixed savings percentage.
+- Updated public runtime examples to use the installed `orqestra` executable and added restrained visual markers for easier README scanning.
+- Streamlined public documentation with a concise roadmap and security policy. Downloadable packages now contain only installation and operational guides.
 
 ## 0.1.0-alpha.1 — 2026-09-06
 
