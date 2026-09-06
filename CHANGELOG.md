@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Improved repository discovery and presentation with a descriptive README title and introduction, status badges, GitHub topics, Discussions, and a dedicated social-preview image.
+- Added a public-alpha launch kit with a one-minute setup path, a simple routing example, the Safe Token visual, a ready-to-share Reddit post, and a structured tester-feedback form.
 
 ## 0.1.0-alpha.2 — 2026-09-06
 

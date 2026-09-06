@@ -15,9 +15,28 @@ Orqestra routes each coding task to the smallest workflow that can handle it res
 
 This approach is designed to reduce avoidable model turns and token consumption while keeping verification explicit. You choose the model policy, worker limits, retry limits, and whether a task should remain with one worker or use coordinated packages.
 
-[🚀 Quick install](#quick-installation) · [🧭 How it works](#how-it-works) · [⌨️ Important commands](#important-commands) · [🧰 Manual installation](docs/INSTALLATION.md)
+[⏱️ Start in 60 seconds](#start-in-60-seconds) · [🚀 Quick install](#quick-installation) · [🧭 How it works](#how-it-works) · [⌨️ Important commands](#important-commands) · [📣 Launch kit](docs/LAUNCH_KIT.md)
 
 **Status: public alpha (`0.1.0-alpha.2`).** Configuration, model policies, route previews, read-only Codex model discovery, project-local setup and upgrades, durable bounded worker execution, isolated multi-package coordination, measured worker token reports, and paired evaluation are implemented. Token savings depend on the task, policy, and models available to the user; no fixed savings percentage has been established.
+
+<a id="start-in-60-seconds"></a>
+
+## ⏱️ Start in 60 seconds
+
+The hands-on part takes about one minute; downloading, verification, and setup can take longer depending on the machine and connection.
+
+1. Make sure [Node.js 22 or newer](https://nodejs.org/en/download) and npm are installed.
+2. Open the project where you want Orqestra in Codex Desktop.
+3. Copy the single prompt from [Quick installation](#quick-installation), paste it into Codex, and let Codex verify and install the release.
+4. Open or reload the project when Codex asks, then try:
+
+```text
+$orqestra preview a plan for adding CSV export to one existing package, including tests. Do not change files.
+```
+
+For a clear, one-package task, the preview should normally recommend a **single-worker** route: one focused implementation worker followed by independent verification. The result can differ when the repository or requested work makes the task unclear, risky, or suitable for direct work.
+
+Want to help test the alpha? The [public launch kit](docs/LAUNCH_KIT.md) includes the Safe Token visual, a reusable routing example, a Reddit post, and a focused alpha-feedback checklist.
 
 <a id="safe-token"></a>
 
