@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "benchmarkId": "csv-export-paired-evaluation",
+  "taskId": "csv-export",
+  "repetitions": 3,
+  "order": "alternating",
+  "preparation": [
+    {
+      "name": "install locked dependencies",
+      "command": ["npm", "ci"],
+      "timeoutSeconds": 600
+    }
+  ],
+  "execution": {
+    "schemaVersion": 1,
+    "task": {
+      "objective": "Add CSV export to the existing report service while preserving JSON export",
+      "complexity": "standard",
+      "risk": "low",
+      "ambiguity": "clear",
+      "independentPackages": 1
+    },
+    "acceptanceCriteria": [
+      "CSV export includes stable headers and rows",
+      "Commas and quotes are escaped correctly",
+      "Existing JSON export remains unchanged"
+    ],
+    "verification": [
+      {
+        "name": "project tests",
+        "command": ["npm", "test"],
+        "timeoutSeconds": 300
+      }
+    ]
+  },
+  "direct": {
+    "model": null,
+    "reasoning": null
+  }
+}

@@ -35,7 +35,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "npm run build && node --test dist/tests/core.test.js dist/tests/cli.test.js dist/tests/discovery.test.js dist/tests/skill-install.test.js dist/tests/config-migration.test.js dist/tests/distribution.test.js dist/tests/usage.test.js dist/tests/accounting.test.js dist/tests/evaluation.test.js dist/tests/worker.test.js dist/tests/durable.test.js dist/tests/coordination.test.js",
+    "test": "npm run build && node --test dist/tests/core.test.js dist/tests/cli.test.js dist/tests/discovery.test.js dist/tests/skill-install.test.js dist/tests/config-migration.test.js dist/tests/distribution.test.js dist/tests/usage.test.js dist/tests/accounting.test.js dist/tests/evaluation.test.js dist/tests/benchmark-runner.test.js dist/tests/worker.test.js dist/tests/durable.test.js dist/tests/coordination.test.js",
     "check": "npm test",
     "demo": "npm run build && node dist/src/cli.js demo",
     "prepack": "npm run build"

@@ -1,6 +1,14 @@
 import { parseTokenUsageBreakdown, type AccountMode, type TokenUsageBreakdown } from './usage.js';
 import { InputError } from './validation.js';
 
+export interface BenchmarkModelUsage {
+  model: string;
+  reasoning: string;
+  turns: number;
+  measuredTurns: number;
+  tokens: TokenUsageBreakdown | null;
+}
+
 export interface BenchmarkObservation {
   source: 'direct-codex' | 'orqestra';
   observedAt: string;
@@ -13,6 +21,7 @@ export interface BenchmarkObservation {
     accountMode: AccountMode;
     tokens: TokenUsageBreakdown | null;
     apiCostUsd: number | null;
+    models: BenchmarkModelUsage[];
   };
 }
 
@@ -26,13 +35,13 @@ export interface BenchmarkTrial {
 }
 
 export interface BenchmarkInput {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   benchmarkId: string;
   trials: BenchmarkTrial[];
 }
 
 export interface BenchmarkReport {
-  schemaVersion: 1;
+  schemaVersion: 2;
   mode: 'benchmark-evaluation';
   benchmarkId: string;
   trials: { total: number; executedPairs: number; incompletePairs: number; tokenMeasuredPairs: number; apiCostMeasuredPairs: number };
@@ -42,6 +51,7 @@ export interface BenchmarkReport {
   retries: { direct: number; orqestra: number };
   elapsedMs: { direct: number; orqestra: number; difference: number };
   tokens: { direct: TokenUsageBreakdown; orqestra: TokenUsageBreakdown; difference: TokenUsageBreakdown } | null;
+  models: { direct: BenchmarkModelUsage[]; orqestra: BenchmarkModelUsage[] };
   apiCostUsd: { direct: number; orqestra: number; difference: number } | null;
   warnings: string[];
 }
@@ -71,7 +81,16 @@ function timestamp(value: unknown, path: string): string {
   return result;
 }
 
-function observation(value: unknown, path: string, source: BenchmarkObservation['source']): BenchmarkObservation | null {
+function modelUsage(value: unknown, path: string): BenchmarkModelUsage {
+  const item = object(value, path, ['model', 'reasoning', 'turns', 'measuredTurns', 'tokens']);
+  const turns = integer(item.turns, `${path}.turns`, 100);
+  const measuredTurns = integer(item.measuredTurns, `${path}.measuredTurns`, turns);
+  const tokens = item.tokens === null ? null : parseTokenUsageBreakdown(item.tokens, `${path}.tokens`);
+  if ((measuredTurns === 0) !== (tokens === null)) throw new InputError(`${path}.tokens must be present exactly when measuredTurns is positive`);
+  return { model: text(item.model, `${path}.model`), reasoning: text(item.reasoning, `${path}.reasoning`), turns, measuredTurns, tokens };
+}
+
+function observation(value: unknown, path: string, source: BenchmarkObservation['source'], schemaVersion: 1 | 2): BenchmarkObservation | null {
   if (value === null) return null;
   const item = object(value, path, ['source', 'observedAt', 'status', 'verification', 'regressions', 'retries', 'elapsedMs', 'usage']);
   if (item.source !== source) throw new InputError(`${path}.source must be ${source}`);
@@ -81,7 +100,7 @@ function observation(value: unknown, path: string, source: BenchmarkObservation[
   const passed = integer(verification.passed, `${path}.verification.passed`, total);
   const regressions = integer(item.regressions, `${path}.regressions`, 1000);
   if (item.status === 'succeeded' && (passed !== total || regressions !== 0)) throw new InputError(`${path}: succeeded requires all checks to pass and zero regressions`);
-  const usage = object(item.usage, `${path}.usage`, ['accountMode', 'tokens', 'apiCostUsd']);
+  const usage = object(item.usage, `${path}.usage`, schemaVersion === 2 ? ['accountMode', 'tokens', 'apiCostUsd', 'models'] : ['accountMode', 'tokens', 'apiCostUsd']);
   if (!['chatgpt', 'apiKey', 'none', 'other'].includes(String(usage.accountMode))) throw new InputError(`${path}.usage.accountMode is invalid`);
   let apiCostUsd: number | null = null;
   if (usage.apiCostUsd !== null) {
@@ -89,21 +108,39 @@ function observation(value: unknown, path: string, source: BenchmarkObservation[
     if (usage.accountMode !== 'apiKey') throw new InputError(`${path}.usage.apiCostUsd is valid only for API-key observations`);
     apiCostUsd = usage.apiCostUsd;
   }
+  const models = schemaVersion === 1 ? [] : (() => {
+    if (!Array.isArray(usage.models) || !usage.models.length || usage.models.length > 100) throw new InputError(`${path}.usage.models must contain 1 to 100 entries`);
+    const rows = usage.models.map((raw, index) => modelUsage(raw, `${path}.usage.models[${index}]`));
+    const identities = new Set(rows.map(row => `${row.model}\0${row.reasoning}`));
+    if (identities.size !== rows.length) throw new InputError(`${path}.usage.models contains duplicate model and reasoning entries`);
+    return rows;
+  })();
+  const tokens = usage.tokens === null ? null : parseTokenUsageBreakdown(usage.tokens, `${path}.usage.tokens`);
+  if (schemaVersion === 2) {
+    const rows = models.map(row => row.tokens).filter((row): row is TokenUsageBreakdown => row !== null);
+    const modelTokens = rows.length ? sumTokenRows(rows) : null;
+    if ((tokens === null) !== (modelTokens === null)) throw new InputError(`${path}.usage.tokens must match the measured per-model usage`);
+    if (tokens && modelTokens && Object.keys(tokens).some(key => tokens[key as keyof TokenUsageBreakdown] !== modelTokens[key as keyof TokenUsageBreakdown])) {
+      throw new InputError(`${path}.usage.tokens must equal the measured per-model token sum`);
+    }
+  }
   return {
     source, observedAt: timestamp(item.observedAt, `${path}.observedAt`), status: item.status,
     verification: { passed, total }, regressions,
     retries: integer(item.retries, `${path}.retries`, 100), elapsedMs: integer(item.elapsedMs, `${path}.elapsedMs`),
     usage: {
       accountMode: usage.accountMode as AccountMode,
-      tokens: usage.tokens === null ? null : parseTokenUsageBreakdown(usage.tokens, `${path}.usage.tokens`),
+      tokens,
       apiCostUsd,
+      models,
     },
   };
 }
 
 export function parseBenchmark(value: unknown): BenchmarkInput {
   const root = object(value, 'benchmark', ['schemaVersion', 'benchmarkId', 'trials']);
-  if (root.schemaVersion !== 1) throw new InputError('benchmark: unsupported schema version; expected 1');
+  if (root.schemaVersion !== 1 && root.schemaVersion !== 2) throw new InputError('benchmark: unsupported schema version; expected 1 or 2');
+  const schemaVersion = root.schemaVersion;
   if (!Array.isArray(root.trials) || !root.trials.length || root.trials.length > 100) throw new InputError('benchmark.trials must contain 1 to 100 trials');
   const ids = new Set<string>();
   const conditions = new Map<string, string>();
@@ -123,11 +160,11 @@ export function parseBenchmark(value: unknown): BenchmarkInput {
     conditions.set(taskId, condition);
     return {
       id, taskId, contractSha256, baseCommit,
-      direct: observation(item.direct, `${path}.direct`, 'direct-codex'),
-      orqestra: observation(item.orqestra, `${path}.orqestra`, 'orqestra'),
+      direct: observation(item.direct, `${path}.direct`, 'direct-codex', schemaVersion),
+      orqestra: observation(item.orqestra, `${path}.orqestra`, 'orqestra', schemaVersion),
     };
   });
-  return { schemaVersion: 1, benchmarkId: text(root.benchmarkId, 'benchmark.benchmarkId'), trials };
+  return { schemaVersion, benchmarkId: text(root.benchmarkId, 'benchmark.benchmarkId'), trials };
 }
 
 function zeroTokens(): TokenUsageBreakdown {
@@ -146,16 +183,44 @@ function tokenDifference(direct: TokenUsageBreakdown, orqestra: TokenUsageBreakd
   return result;
 }
 
+function completeModelUsage(observation: BenchmarkObservation): boolean {
+  return observation.usage.models.length > 0 && observation.usage.models.every(row => row.turns === row.measuredTurns);
+}
+
+function aggregateModels(observations: BenchmarkObservation[]): BenchmarkModelUsage[] {
+  const groups = new Map<string, BenchmarkModelUsage>();
+  for (const observation of observations) for (const row of observation.usage.models) {
+    const key = `${row.model}\0${row.reasoning}`;
+    const current = groups.get(key) ?? { model: row.model, reasoning: row.reasoning, turns: 0, measuredTurns: 0, tokens: null };
+    current.turns += row.turns;
+    current.measuredTurns += row.measuredTurns;
+    if (row.tokens) current.tokens = current.tokens ? addTokenRows(current.tokens, row.tokens) : { ...row.tokens };
+    groups.set(key, current);
+  }
+  return [...groups.values()].sort((left, right) => left.model.localeCompare(right.model) || left.reasoning.localeCompare(right.reasoning));
+}
+
+function addTokenRows(left: TokenUsageBreakdown, right: TokenUsageBreakdown): TokenUsageBreakdown {
+  const result = zeroTokens();
+  for (const key of Object.keys(result) as Array<keyof TokenUsageBreakdown>) {
+    const value = left[key] + right[key];
+    if (!Number.isSafeInteger(value)) throw new InputError('Aggregated model usage exceeds the safe integer limit');
+    result[key] = value;
+  }
+  return result;
+}
+
 export function evaluateBenchmark(input: BenchmarkInput): BenchmarkReport {
   const pairs = input.trials.filter((trial): trial is BenchmarkTrial & { direct: BenchmarkObservation; orqestra: BenchmarkObservation } => Boolean(trial.direct && trial.orqestra));
-  const tokenPairs = pairs.filter(pair => pair.direct.usage.tokens !== null && pair.orqestra.usage.tokens !== null);
+  const tokenPairs = pairs.filter(pair => pair.direct.usage.tokens !== null && pair.orqestra.usage.tokens !== null
+    && (input.schemaVersion === 1 || (completeModelUsage(pair.direct) && completeModelUsage(pair.orqestra))));
   const costPairs = pairs.filter(pair => pair.direct.usage.apiCostUsd !== null && pair.orqestra.usage.apiCostUsd !== null);
   const directTokens = sumTokenRows(tokenPairs.map(pair => pair.direct.usage.tokens!));
   const orqestraTokens = sumTokenRows(tokenPairs.map(pair => pair.orqestra.usage.tokens!));
   const directCost = costPairs.reduce((sum, pair) => sum + pair.direct.usage.apiCostUsd!, 0);
   const orqestraCost = costPairs.reduce((sum, pair) => sum + pair.orqestra.usage.apiCostUsd!, 0);
   return {
-    schemaVersion: 1, mode: 'benchmark-evaluation', benchmarkId: input.benchmarkId,
+    schemaVersion: 2, mode: 'benchmark-evaluation', benchmarkId: input.benchmarkId,
     trials: { total: input.trials.length, executedPairs: pairs.length, incompletePairs: input.trials.length - pairs.length, tokenMeasuredPairs: tokenPairs.length, apiCostMeasuredPairs: costPairs.length },
     completion: { directSucceeded: pairs.filter(pair => pair.direct.status === 'succeeded').length, orqestraSucceeded: pairs.filter(pair => pair.orqestra.status === 'succeeded').length },
     verification: {
@@ -169,13 +234,14 @@ export function evaluateBenchmark(input: BenchmarkInput): BenchmarkReport {
       difference: pairs.reduce((sum, pair) => sum + pair.orqestra.elapsedMs - pair.direct.elapsedMs, 0),
     },
     tokens: tokenPairs.length ? { direct: directTokens, orqestra: orqestraTokens, difference: tokenDifference(directTokens, orqestraTokens) } : null,
+    models: { direct: aggregateModels(pairs.map(pair => pair.direct)), orqestra: aggregateModels(pairs.map(pair => pair.orqestra)) },
     apiCostUsd: costPairs.length ? { direct: directCost, orqestra: orqestraCost, difference: orqestraCost - directCost } : null,
     warnings: [
       'Differences use executed pairs only; negative values mean Orqestra used less than direct Codex within those pairs.',
       'Incomplete trials and pairs without matching measured usage are excluded from the corresponding difference.',
+      'Schema 2 token differences require complete per-model turn coverage for both arms.',
       'The evaluator validates evidence structure and shared starting conditions; it does not independently attest caller-recorded observations.',
       'No unexecuted counterfactual is reported as savings.',
     ],
   };
 }
-

@@ -9,7 +9,7 @@ Orqestra is a public alpha. This roadmap records product direction rather than d
 - Read-only Codex model discovery and runtime diagnostics.
 - Durable bounded worker execution with independent verification and resume.
 - Isolated package coordination with dependency scheduling, worker limits, and deterministic integration.
-- Worker usage reporting with explicit visibility gaps and reproducible paired-evaluation records.
+- Worker usage reporting with explicit visibility gaps, reproducible paired-evaluation records, and an automated isolated paired runner for single-worker tasks.
 - Versioned project setup, configuration migration, integrity-checked upgrades, and reversible removal.
 
 The supported commands and their current limits are documented in [CONFIGURATION.md](CONFIGURATION.md). Tested runtime and platform evidence is recorded in [COMPATIBILITY.md](COMPATIBILITY.md).
@@ -19,7 +19,7 @@ The supported commands and their current limits are documented in [CONFIGURATION
 1. Gather public-alpha feedback on installation, task contracts, routing decisions, and recovery messages.
 2. Expand live compatibility evidence for interruption, cancellation, resume, and coordinated execution paths.
 3. Make model and limit configuration easier inside Codex while preserving strict validation and existing project data.
-4. Publish reproducible paired benchmarks before making numerical token, quality, or cost-savings claims.
+4. Run and publish reproducible multi-task paired benchmarks before making numerical token, quality, or cost-savings claims.
 5. Add runtime adapters only when discovery, execution, permissions, recovery, and usage boundaries can be tested end to end.
 
 ## Design commitments

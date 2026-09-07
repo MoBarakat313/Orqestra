@@ -65,3 +65,36 @@ test('benchmark CLI emits the same strict measured-pair report', async () => {
     assert.equal(report.tokens.difference.totalTokens, -30);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
+
+test('schema 2 reports per-model coverage and excludes partial token pairs', () => {
+  const direct = observation('direct-codex', 150, 0);
+  const orqestra = observation('orqestra', 120, 0);
+  const withModels = {
+    schemaVersion: 2,
+    benchmarkId: 'model-coverage',
+    trials: [{
+      id: 'one', taskId: 'task-a', contractSha256: 'a'.repeat(64), baseCommit: 'b'.repeat(40),
+      direct: { ...direct, usage: { ...direct.usage, models: [{ model: 'gpt-direct', reasoning: 'medium', turns: 1, measuredTurns: 1, tokens: direct.usage.tokens }] } },
+      orqestra: { ...orqestra, usage: { ...orqestra.usage, models: [{ model: 'gpt-worker', reasoning: 'medium', turns: 2, measuredTurns: 1, tokens: orqestra.usage.tokens }] } },
+    }],
+  };
+  const report = evaluateBenchmark(parseBenchmark(withModels));
+  assert.equal(report.trials.executedPairs, 1);
+  assert.equal(report.trials.tokenMeasuredPairs, 0);
+  assert.equal(report.tokens, null);
+  assert.deepEqual(report.models.orqestra.map(row => [row.model, row.turns, row.measuredTurns]), [['gpt-worker', 2, 1]]);
+});
+
+test('schema 2 rejects token totals that do not equal their per-model rows', () => {
+  const direct = observation('direct-codex', 150, 0);
+  const mismatched = {
+    schemaVersion: 2,
+    benchmarkId: 'mismatched-model-total',
+    trials: [{
+      id: 'one', taskId: 'task-a', contractSha256: 'a'.repeat(64), baseCommit: 'b'.repeat(40),
+      direct: { ...direct, usage: { ...direct.usage, models: [{ model: 'gpt-direct', reasoning: 'medium', turns: 1, measuredTurns: 1, tokens: { ...direct.usage.tokens, totalTokens: 149 } }] } },
+      orqestra: null,
+    }],
+  };
+  assert.throws(() => parseBenchmark(mismatched), /must equal the measured per-model token sum/);
+});

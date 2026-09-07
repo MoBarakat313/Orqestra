@@ -4,6 +4,7 @@
 
 - Improved repository discovery and presentation with a descriptive README title and introduction, status badges, GitHub topics, Discussions, and a dedicated social-preview image.
 - Added a public-alpha launch kit with a one-minute setup path, a simple routing example, the Safe Token visual, and a structured tester-feedback form.
+- Added an automated paired benchmark runner with isolated worktrees, alternating arm order, identical preparation and verification, privacy-bounded evidence, complete-coverage token comparisons, and per-model usage rows.
 
 ## 0.1.0-alpha.2 — 2026-09-06
 

@@ -278,9 +278,9 @@ export async function verifyContract(projectPath: string, checks: VerificationCo
   return results;
 }
 
-function prompt(contract: ExecutionContract, repair?: WorkerOptions['repair']): string {
+export function workerPrompt(contract: ExecutionContract, repair?: WorkerOptions['repair']): string {
   return [
-    'You are the single bounded implementation worker for Orqestra.',
+    'You are a single bounded implementation worker.',
     ...(repair ? [
       `This is repair attempt ${repair.attempt}. Preserve useful existing edits and fix the remaining verification failure.`,
       `Previous verification result: ${clean(repair.previousFailure, 8000) ?? 'failure details unavailable'}`,
@@ -396,7 +396,7 @@ export async function runWorker(contract: ExecutionContract, assignment: Assignm
     activeThread = threadId = thread.id;
     await options.onCheckpoint?.({ phase: 'thread-started', threadId });
     const turnStarted = record(await client.request('turn/start', {
-      threadId, input: [{ type: 'text', text: prompt(contract, options.repair) }], cwd: project,
+      threadId, input: [{ type: 'text', text: workerPrompt(contract, options.repair) }], cwd: project,
       approvalPolicy: 'on-request', approvalsReviewer: 'user', model: assignment.id, effort: assignment.reasoning,
       sandboxPolicy: { type: 'workspaceWrite', writableRoots: [project], networkAccess: false }, summary: 'concise',
     }), 'turn/start response');

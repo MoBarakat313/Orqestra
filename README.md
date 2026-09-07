@@ -63,7 +63,7 @@ Orqestra controls avoidable orchestration work before workers are started:
 | Deterministic checks | Verification commands and coordinated integration run without adding a model turn. |
 | Honest accounting | Reports include worker tokens exposed by Codex and identify missing telemetry instead of estimating it. |
 
-This is what **Safe Token** means in Orqestra: direct work when sufficient, focused context when a worker helps, explicit use of premium models, bounded concurrency, bounded repair attempts, and deterministic checks that do not start another model turn. The main Codex conversation remains outside the helper's token visibility. Account-level usage is account-wide, and a preview is not evidence of savings. Orqestra includes a paired benchmark format so future public comparisons can use the same task, Git base, checks, and measured observations.
+This is what **Safe Token** means in Orqestra: direct work when sufficient, focused context when a worker helps, explicit use of premium models, bounded concurrency, bounded repair attempts, and deterministic checks that do not start another model turn. The main Codex conversation remains outside the helper's token visibility. Account-level usage is account-wide, and a preview is not evidence of savings. Orqestra includes an automated paired benchmark runner so public comparisons can repeat both approaches from the same Git commit with the same task, checks, and measured observations.
 
 <a id="how-it-works"></a>
 
@@ -267,11 +267,12 @@ Use `coordinate-resume` with the reported run ID after a paused transport. Commi
 ```sh
 orqestra usage --json
 orqestra benchmark --input /absolute/path/to/benchmark.json --json
+orqestra benchmark-run --input /absolute/path/to/benchmark-run.json --project /absolute/path/to/clean-project --config /absolute/path/to/orqestra.config.json --json
 ```
 
 Worker reports keep input, cached input, cache-write input, output, reasoning-output, and total token categories when App Server exposes them. Missing or interrupted telemetry is reported as a visibility gap. ChatGPT account observations remain account-wide and are never converted to API cost; API-key reports do not invent organization billing data. The main Codex conversation remains outside the helper's visibility.
 
-The benchmark command accepts direct Codex and Orqestra observations tied to the same task contract and Git base commit. It reports completion, verification, regressions, retries, elapsed time, and only fully paired measured token or API-cost differences. See [usage accounting and paired evaluation](docs/ACCOUNTING_AND_EVALUATION.md).
+`benchmark-run` automates repeated single-worker pairs from the same Git commit, alternates arm order, applies the same preparation and verification, captures direct JSONL and Orqestra App Server usage, and writes privacy-bounded artifacts under private Git metadata. The `benchmark` command also accepts observations collected elsewhere. Reports include completion, verification, regressions, retries, time, per-model coverage, and only fully measured paired token differences. See [usage accounting and paired evaluation](docs/ACCOUNTING_AND_EVALUATION.md).
 
 ## 🧪 Development
 

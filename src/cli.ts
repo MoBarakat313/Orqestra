@@ -14,6 +14,8 @@ import { resumeCoordinated, runCoordinated, type CoordinationReport } from './ru
 import type { Profile, RoutePlan } from './core/types.js';
 import { inspectAccountUsage } from './runtime/accounting.js';
 import { evaluateBenchmark, parseBenchmark } from './core/evaluation.js';
+import { parseBenchmarkRunSpec } from './core/benchmark-run.js';
+import { runAutomatedBenchmark } from './runtime/benchmark-runner.js';
 import type { UsageSummary } from './core/usage.js';
 import { migrateConfigFile } from './runtime/config-migration.js';
 import { setupProject } from './runtime/setup.js';
@@ -33,6 +35,7 @@ Usage:
   orqestra models [--codex <executable>] [--output <catalog.json> --config <path>]
   orqestra usage [--codex <executable>]
   orqestra benchmark --input <benchmark.json>
+  orqestra benchmark-run --input <benchmark-run.json> --project <directory> [--config <path>] [--codex <executable>] [--turn-timeout <seconds>]
   orqestra run --request <execution.json> --project <directory> [--config <path>] [--codex <executable>] [--turn-timeout <seconds>] [--state-dir <directory>]
   orqestra resume --run-id <id> --request <execution.json> --project <directory> [--config <path>] [--codex <executable>] [--turn-timeout <seconds>] [--state-dir <directory>]
   orqestra coordinate --request <coordination.json> --project <directory> [--config <path>] [--codex <executable>] [--turn-timeout <seconds>]
@@ -50,6 +53,7 @@ coordinate runs dependency-aware packages in isolated worktrees and verifies the
 coordinate-resume continues a matching paused coordination checkpoint without redispatching committed packages.
 usage reads account-level observations without starting a model turn; ChatGPT account and API-key modes remain distinct.
 benchmark evaluates recorded direct-Codex and Orqestra pairs with matching task conditions.
+benchmark-run creates paired worktrees, executes both arms, captures measured usage, and evaluates the completed ledger.
 The worker has project-only write access and no network. Approval requests are cancelled and reported; none are granted automatically.
 Skill installation is project-local and preserves existing installations/settings.
 setup creates or migrates the project policy and installs or safely upgrades the project skill.
@@ -129,7 +133,7 @@ async function main(): Promise<void> {
     version: [], setup: ['project', 'profile'],
     init: ['profile', 'config'], validate: ['config'], plan: ['task', 'config', 'catalog'], demo: ['profile'], doctor: ['codex'], models: ['codex', 'output', 'config'],
     'migrate-config': ['config'],
-    usage: ['codex'], benchmark: ['input'],
+    usage: ['codex'], benchmark: ['input'], 'benchmark-run': ['input', 'project', 'config', 'codex', 'turn-timeout'],
     run: ['request', 'project', 'config', 'codex', 'turn-timeout', 'state-dir'],
     resume: ['run-id', 'request', 'project', 'config', 'codex', 'turn-timeout', 'state-dir'],
     coordinate: ['request', 'project', 'config', 'codex', 'turn-timeout'],
@@ -226,6 +230,36 @@ async function main(): Promise<void> {
       ...(report.apiCostUsd ? [`Measured paired API cost difference: $${report.apiCostUsd.difference.toFixed(6)}`] : ['Measured paired API cost difference: unavailable']),
       ...report.warnings.map(warning => `Note: ${warning}`),
     ].join('\n'));
+  } else if (command === 'benchmark-run') {
+    if (!values.input || !values.project) throw new InputError('benchmark-run requires --input <benchmark-run.json> and --project <directory>');
+    const config = parseConfig(await readJson(configPath));
+    const specification = parseBenchmarkRunSpec(await readJson(values.input));
+    const controller = new AbortController();
+    const abort = (): void => controller.abort();
+    process.once('SIGINT', abort);
+    process.once('SIGTERM', abort);
+    try {
+      const report = await runAutomatedBenchmark(specification, config, {
+        project: values.project,
+        ...(values.codex ? { executable: values.codex } : {}),
+        timeoutSeconds: boundedInteger(values['turn-timeout'], config.limits.turnTimeoutSeconds, '--turn-timeout', 1, 3600),
+        signal: controller.signal,
+      });
+      emit(report, [
+        `Automated benchmark ${report.benchmarkId}: ${report.benchmark.trials.executedPairs}/${report.benchmark.trials.total} paired trials`,
+        `Base: ${report.baseCommit}`,
+        `Direct: ${report.comparison.direct.model} (${report.comparison.direct.reasoning})`,
+        `Orqestra: ${report.comparison.orqestra.model} (${report.comparison.orqestra.reasoning})`,
+        `Completion: direct ${report.benchmark.completion.directSucceeded}; Orqestra ${report.benchmark.completion.orqestraSucceeded}`,
+        ...(report.benchmark.tokens ? [`Measured paired token difference: ${report.benchmark.tokens.difference.totalTokens}`] : ['Measured paired token difference: unavailable']),
+        `Private ledger: ${report.artifacts.ledger}`,
+        `Private report: ${report.artifacts.report}`,
+        ...report.warnings.map(warning => `Note: ${warning}`),
+      ].join('\n'));
+    } finally {
+      process.removeListener('SIGINT', abort);
+      process.removeListener('SIGTERM', abort);
+    }
   } else if (command === 'run' || command === 'resume') {
     if (!values.request || !values.project) throw new InputError(`${command} requires --request <execution.json> and --project <directory>`);
     if (command === 'resume' && !values['run-id']) throw new InputError('resume requires --run-id <id>');

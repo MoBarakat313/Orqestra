@@ -161,6 +161,20 @@ orqestra benchmark --input /absolute/path/to/benchmark.json --json
 
 Benchmarking compares recorded direct Codex and Orqestra runs only when they share the same task contract and Git base. It does not estimate missing runs or claim savings from a preview.
 
+### Run a measured paired evaluation
+
+Start with `examples/benchmark-run.json`, customize its task and checks, and use a disposable clean Git project:
+
+```sh
+orqestra benchmark-run \
+  --input /absolute/path/to/benchmark-run.json \
+  --project /absolute/path/to/clean-project \
+  --config /absolute/path/to/orqestra.config.json \
+  --json
+```
+
+Leave `direct.model` and `direct.reasoning` as `null` for a same-model comparison. Set both fields explicitly for a policy comparison. Orqestra alternates the arm order by default in the example, keeps the original checkout unchanged, and stores the ledger, report, worktrees, and durable state under private Git metadata. Review multiple completed pairs before describing a measured difference; one run is not a general savings result.
+
 ## Update or remove Orqestra
 
 ### Check the installed project skill
@@ -213,6 +227,7 @@ Remove project skills before the global command when you no longer want Orqestra
 | `orqestra coordinate-resume` | Continues matching paused package runs without repeating committed packages. |
 | `orqestra usage` | Reads bounded account-level observations without starting a model turn. |
 | `orqestra benchmark` | Evaluates recorded direct Codex and Orqestra pairs. |
+| `orqestra benchmark-run` | Runs repeated direct Codex and Orqestra pairs in isolated worktrees and writes a private measured report. |
 | `orqestra install-skill` | Installs the project skill without creating a policy. `setup` is easier for new users. |
 | `orqestra skill-status` | Verifies project-skill ownership, version, and file integrity. |
 | `orqestra upgrade-skill` | Safely upgrades a pristine project skill from the installed package. |

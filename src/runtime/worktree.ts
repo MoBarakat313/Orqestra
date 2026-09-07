@@ -61,6 +61,14 @@ export async function coordinationRoot(project: string, runId: string): Promise<
   return root;
 }
 
+export async function benchmarkRoot(project: string, runId: string): Promise<string> {
+  const root = join(await gitCommonDirectory(project), 'orqestra', 'benchmarks', runId);
+  await mkdir(root, { recursive: true, mode: 0o700 });
+  const info = await lstat(root);
+  if (!info.isDirectory() || info.isSymbolicLink()) throw new ProtocolError('Benchmark root must be a real directory');
+  return root;
+}
+
 export async function createDetachedWorktree(project: string, path: string, head: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
   await git(project, ['worktree', 'add', '--detach', path, head]);

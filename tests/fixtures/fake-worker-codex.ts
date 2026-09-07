@@ -6,7 +6,30 @@ const arg = process.argv[2];
 if (arg === '--version') {
   console.log('codex-cli worker-fixture');
 } else if (arg === '--help') {
-  console.log('Commands:\n  app-server  Start the worker fixture protocol server');
+  console.log('Commands:\n  app-server  Start the worker fixture protocol server\n  exec  Run one JSONL fixture turn');
+} else if (arg === 'exec') {
+  const scenario = process.env.ORQESTRA_WORKER_SCENARIO ?? 'success';
+  const chunks: Buffer[] = [];
+  process.stdin.on('data', (chunk: Buffer) => chunks.push(chunk));
+  process.stdin.on('end', () => {
+    if (!Buffer.concat(chunks).length) process.exitCode = 11;
+    const send = (value: unknown): void => { process.stdout.write(JSON.stringify(value) + '\n'); };
+    send({ type: 'thread.started', thread_id: 'direct-thread-fixture' });
+    send({ type: 'turn.started' });
+    if (scenario === 'benchmark-direct-failure') {
+      send({ type: 'turn.failed', error: { message: 'private direct fixture failure' } });
+      process.exitCode = 1;
+      return;
+    }
+    writeFileSync(join(process.cwd(), 'result.txt'), 'done\n');
+    send({ type: 'item.completed', item: { type: 'agent_message', text: 'private direct fixture response' } });
+    if (scenario !== 'direct-missing-usage') send({
+      type: 'turn.completed',
+      usage: { input_tokens: 90, cached_input_tokens: 40, output_tokens: 10, reasoning_output_tokens: 2 },
+    });
+    else send({ type: 'turn.completed' });
+    if (scenario === 'direct-nonzero-after-complete') process.exitCode = 1;
+  });
 } else {
   const scenario = process.env.ORQESTRA_WORKER_SCENARIO ?? 'success';
   const input = createInterface({ input: process.stdin });
